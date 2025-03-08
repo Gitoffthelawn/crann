@@ -1,4 +1,3 @@
-
 ![crann_logo](img/crann_logo_smaller.png)
 
 `npm i crann`
@@ -26,21 +25,21 @@ const crann = create({
     name: {default: '', partition: Partition.Instance} // partitioned state will be different for each connected context, so everyone connected except the service worker
 });
 
-// Get the state whenever you like. 
-const {active, trees} =  crann.get() // Not passing in a key will only get state that is common to all, aka no partitioned state
-const {active, trees, name} = crann.get('instancekey') // Passing in a key will return the common state AND the partitioned state for that instance
+// Get the state whenever you like.
+const {active, trees} =  crann.get() // Not passing in a key will only get state that is service to all, aka no partitioned state
+const {active, trees, name} = crann.get('instancekey') // Passing in a key will return the service state AND the partitioned state for that instance
 
 // subscribe to listen for state changes
 crann.subscribe( (state, changes, key) => {
     const { active, trees, name } = state;
-    console.log('Common state: active: ', active, ', trees: ', trees);
+    console.log('Service state: active: ', active, ', trees: ', trees);
     console.log(`Instance state for ${key}: `, name);
     // or just look at changes.
 
     // key will be the id of the context that made the state update, or null if the update came from the service worker (here)
 });
 
-// Set the state (either for an instance or for the common state)
+// Set the state (either for an instance or for the service state)
 crann.set({active: true}) // Will notify all connected contexts that active is now true.
 crann.set({name: 'ContentScript'}, 'instancekey'); // Or set for a particular instance if you like
 ```
@@ -48,20 +47,22 @@ crann.set({name: 'ContentScript'}, 'instancekey'); // Or set for a particular in
 ### Then, connect to your Crann instance from any context you like -- eg. content scripts
 
 ```typescript
-import {connect} from 'crann';
-const {get, set, subscribe} = connect();
+import { connect } from "crann";
+const { get, set, subscribe } = connect();
 
-// Similar to the service worker environment, except we will always be dealing with common state AND our own instance state. No distinction from our point of view.
-const {active, trees, name} = get();
+// Similar to the service worker environment, except we will always be dealing with service state AND our own instance state. No distinction from our point of view.
+const { active, trees, name } = get();
 
 // Set the state
-set({name: 'My own name'})
+set({ name: "My own name" });
 
 // subscribe to listen for a particular item of state changing, or any change
-subscribe((changes) => {
-    console.log('Trees changed! new value: ', changes.trees)
-}, ['trees']);
-
+subscribe(
+  (changes) => {
+    console.log("Trees changed! new value: ", changes.trees);
+  },
+  ["trees"]
+);
 ```
 
 ### Finally, Persist state!
@@ -82,5 +83,5 @@ const crann = create({
     firstOpened: {default: new Date(), Persistence.Session}
 });
 
-// note: Persisted state is Common state by default (shared with all contexts)
+// note: Persisted state is Service state by default (shared with all contexts)
 ```
