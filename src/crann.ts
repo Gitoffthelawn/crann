@@ -29,8 +29,6 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
     ) => void
   > = [];
   private storagePrefix = "crann_";
-  private post: (message: Message<any>, target?: MessageTarget) => void =
-    () => {};
   private debug: boolean = false;
   private porter = source("crann");
 
@@ -70,7 +68,7 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
         { info }
       );
       const fullState = this.get(info.id);
-      this.post(
+      this.porter.post(
         {
           action: "initialState",
           payload: { state: fullState, info },
@@ -254,7 +252,7 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
 
     if (key && agent?.info.location) {
       this.instanceLog("Notifying of state change.", key);
-      this.post(
+      this.porter.post(
         { action: "stateUpdate", payload: { state: changes } },
         agent.info.location
       );
@@ -262,7 +260,10 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
       console.log("Notifying everyone");
       // for every key of this.instances, post the state update to the corresponding key
       this.instances.forEach((_, key) => {
-        this.post({ action: "stateUpdate", payload: { state: changes } }, key);
+        this.porter.post(
+          { action: "stateUpdate", payload: { state: changes } },
+          key
+        );
       });
     }
   }
