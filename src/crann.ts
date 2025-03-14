@@ -59,6 +59,11 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
       },
     });
     this.porter.onMessagesSet((info: AgentInfo) => {
+      if (!info) {
+        this.error("Messages set but no agent info.", { info });
+        return;
+      }
+
       this.instanceLog(
         "Messages set received. Sending initial state.",
         this.getAgentTag(info),
@@ -74,6 +79,10 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
       );
     });
     this.porter.onConnect((info: AgentInfo) => {
+      if (!info) {
+        this.error("Agent connected but no agent info.", { info });
+        return;
+      }
       const agentTag = this.getAgentTag(info);
       this.instanceLog("Agent connected ", agentTag, { info });
       this.addInstance(info.id);
