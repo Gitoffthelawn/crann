@@ -28,6 +28,9 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
       agent?: AgentInfo
     ) => void
   > = [];
+  private instanceReadyListeners: Array<
+    (instanceId: string, agent: AgentInfo) => void
+  > = [];
   private storagePrefix = "crann_";
   private debug: boolean = false;
   private porter = source("crann");
@@ -75,6 +78,8 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
         },
         info.location
       );
+
+      this.notifyInstanceReady(info.id, info);
     });
     this.porter.onConnect((info: AgentInfo) => {
       if (!info) {
@@ -399,6 +404,29 @@ export class Crann<TConfig extends Record<string, ConfigItem<any>>> {
     return serviceState;
   }
 
+  public subscribeToInstanceReady(
+    listener: (instanceId: string, agent: AgentInfo) => void
+  ): void {
+    this.log("Subscribing to instance ready events");
+    this.instanceReadyListeners.push(listener);
+
+    this.instances.forEach((_, instanceId) => {
+      const agent = this.porter.getAgentById(instanceId);
+      if (agent?.info) {
+        listener(instanceId, agent.info);
+      }
+    });
+  }
+
+  private notifyInstanceReady(instanceId: string, info: AgentInfo): void {
+    if (this.instanceReadyListeners.length > 0) {
+      this.instanceLog("Notifying instance ready listeners", instanceId);
+      this.instanceReadyListeners.forEach((listener) => {
+        listener(instanceId, info);
+      });
+    }
+  }
+
   private log(message: string, ...args: any[]) {
     if (this.debug) {
       console.log(`CrannSource [core], ` + message, ...args);
@@ -441,6 +469,9 @@ export interface CrannAPI<TConfig extends Record<string, ConfigItem<any>>> {
       agent?: AgentInfo
     ) => void
   ) => void;
+  onInstanceReady: (
+    listener: (instanceId: string, agent: AgentInfo) => void
+  ) => void;
   findInstance: (location: BrowserLocation) => string | null;
   queryAgents: (query: Partial<BrowserLocation>) => Agent[];
   clear: () => Promise<void>;
@@ -456,6 +487,7 @@ export function create<TConfig extends Record<string, ConfigItem<any>>>(
     get: instance.get.bind(instance),
     set: instance.set.bind(instance),
     subscribe: instance.subscribe.bind(instance),
+    onInstanceReady: instance.subscribeToInstanceReady.bind(instance),
     findInstance: instance.findInstance.bind(instance),
     queryAgents: instance.queryAgents.bind(instance),
     clear: instance.clear.bind(instance),
