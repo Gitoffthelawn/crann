@@ -1,12 +1,7 @@
 {
   "name": "crann",
-<<<<<<< Updated upstream
   "version": "1.0.35",
-  "description": "",
-=======
-  "version": "1.0.34",
   "description": "Effortless State Synchronization for Web Extensions",
->>>>>>> Stashed changes
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
