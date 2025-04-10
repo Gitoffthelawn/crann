@@ -5,16 +5,16 @@
 ## Table of Contents
 
 - [Core Features](#core-features)
-- [The Challenge](#the-challenge-state-across-extension-contexts)
-- [The Solution](#the-solution-how-crann-simplifies-synchronization)
 - [Quick Start](#quick-start-a-simple-synchronization-example)
-- [Getting Started](#getting-started-core-usage)
+- [Core Usage](#getting-started-core-usage)
 - [Advanced Features](#advanced-features)
   - [Complex Types](#handling-complex-types)
   - [Partitioned State](#understanding-partitioned-state)
   - [Persistence](#state-persistence-options)
   - [Advanced API](#advanced-api-functions)
   - [React Integration](#react-integration)
+- [What Was The Problem?](#what-was-the-problem)
+- [Why Is This Better?](#why-is-this-better-how-crann-simplifies-synchronization)
 
 ## Crann: Effortless State Synchronization for Web Extensions
 
@@ -28,35 +28,6 @@ Crann synchronizes state across all parts of your Web Extension with full TypeSc
 - Reactive state updates via subscriptions (`subscribe`)
 - Optional state persistence (`Persistence.Local` / `Persistence.Session`)
 - Strong TypeScript inference and support for type safety
-
-## The Challenge: State Across Extension Contexts
-
-Browser extensions often have multiple components:
-
-- **Service Worker:** A background script handling core logic and events.
-- **Content Scripts:** JavaScript injected directly into web pages.
-- **Popup:** A small window shown when clicking the extension icon.
-- **Side Panels, DevTools Pages:** Other specialized UI or inspection contexts.
-
-These components run in isolated environments. Sharing data or coordinating actions between them traditionally requires manually sending messages back and forth using APIs like `chrome.runtime.sendMessage` and setting up listeners (`chrome.runtime.onMessage`). This can quickly lead to complex, hard-to-debug "spaghetti code" as your extension grows.
-
-## The Solution: How Crann Simplifies Synchronization
-
-Crann acts as a central state management hub, typically initialized in your service worker. It provides a single source of truth for your shared data. Other contexts connect to this hub, allowing them to easily read state, update it, and subscribe to changes.
-
-**Visualizing the Problem: Manual Message Passing vs. Crann's Centralized State**
-
-![with_messages](img/with_messages.png)
-_Traditional message passing requires complex, bidirectional communication between all parts._
-
-![with_crann](img/with_crann.png)
-_Crann's centralized state management simplifies the architecture by eliminating the need for manual message passing._
-
-This dramatically simplifies your architecture:
-
-- **No more manual messaging:** Crann handles the communication internally.
-- **Single source of truth:** State is managed centrally.
-- **Reactivity:** Components automatically react to state changes they care about.
 
 ### Quick Start: A Simple Synchronization Example
 
@@ -470,3 +441,34 @@ function OptimizedComponent() {
   );
 }
 ```
+
+
+## What Was The Problem?
+
+Browser extensions often have multiple components:
+
+- **Service Worker:** A background script handling core logic and events.
+- **Content Scripts:** JavaScript injected directly into web pages.
+- **Popup:** A small window shown when clicking the extension icon.
+- **Side Panels, DevTools Pages:** Other specialized UI or inspection contexts.
+
+These components run in isolated environments. Sharing data or coordinating actions between them traditionally requires manually sending messages back and forth using APIs like `chrome.runtime.sendMessage` and setting up listeners (`chrome.runtime.onMessage`). This can quickly lead to complex, hard-to-debug "spaghetti code" as your extension grows.
+
+## Why Is This Better: How Crann Simplifies Synchronization
+
+Crann acts as a central state management hub, typically initialized in your service worker. It provides a single source of truth for your shared data. Other contexts connect to this hub, allowing them to easily read state, update it, and subscribe to changes.
+
+**Visualizing the Problem: Manual Message Passing vs. Crann's Centralized State**
+
+![with_messages](img/with_messages.png)
+_Traditional message passing requires complex, bidirectional communication between all parts._
+
+![with_crann](img/with_crann.png)
+_Crann's centralized state management simplifies the architecture by eliminating the need for manual message passing._
+
+This dramatically simplifies your architecture:
+
+- **No more manual messaging:** Crann handles the communication internally.
+- **Single source of truth:** State is managed centrally.
+- **Reactivity:** Components automatically react to state changes they care about.
+
