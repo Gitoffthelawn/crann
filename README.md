@@ -1,3 +1,5 @@
+Crann: Effortless State Synchronization for Web Extensions
+
 ![crann_logo](img/crann_logo_smaller.png)
 
 `npm i crann`
@@ -16,7 +18,7 @@
 - [What Was The Problem?](#what-was-the-problem)
 - [Why Is This Better?](#why-is-this-better-how-crann-simplifies-synchronization)
 
-## Crann: Effortless State Synchronization for Web Extensions
+##State Synchronization for Web Extensions
 
 Crann synchronizes state across all parts of your Web Extension with full TypeScript support, eliminating the need for complex manual message passing. Focus on your extension's features, not the plumbing.
 
