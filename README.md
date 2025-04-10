@@ -2,86 +2,471 @@
 
 `npm i crann`
 
-Crann synchronizes state in Web Extensions, with full Typescript support.
+## Table of Contents
+
+- [Core Features](#core-features)
+- [The Challenge](#the-challenge-state-across-extension-contexts)
+- [The Solution](#the-solution-how-crann-simplifies-synchronization)
+- [Quick Start](#quick-start-a-simple-synchronization-example)
+- [Getting Started](#getting-started-core-usage)
+- [Advanced Features](#advanced-features)
+  - [Complex Types](#handling-complex-types)
+  - [Partitioned State](#understanding-partitioned-state)
+  - [Persistence](#state-persistence-options)
+  - [Advanced API](#advanced-api-functions)
+  - [React Integration](#react-integration)
+
+## Crann: Effortless State Synchronization for Web Extensions
+
+Crann synchronizes state across all parts of your Web Extension with full TypeScript support, eliminating the need for complex manual message passing. Focus on your extension's features, not the plumbing.
+
+**Core Features:**
 
 - Minimal size (< 5kb)
-- Syncs state between any context you might want - Content Scripts, Devtools, Sidepanels, Popup etc.
-- Removes the need for a tangled web of message passing
-- React to state! Better coding patterns.
-- Optionally persist any value to storage (local or session) via config.
+- Syncs state between any context (Content Scripts, Service Worker, Devtools, Sidepanels, Popup, etc.)
+- Eliminates manual `chrome.runtime.sendMessage` / `onMessage` boilerplate
+- Reactive state updates via subscriptions (`subscribe`)
+- Optional state persistence (`Persistence.Local` / `Persistence.Session`)
+- Strong TypeScript inference and support for type safety
 
-### First, create a Crann instance
+## The Challenge: State Across Extension Contexts
 
-Crann needs a service worker to coordinate state and access
+Browser extensions often have multiple components:
+
+- **Service Worker:** A background script handling core logic and events.
+- **Content Scripts:** JavaScript injected directly into web pages.
+- **Popup:** A small window shown when clicking the extension icon.
+- **Side Panels, DevTools Pages:** Other specialized UI or inspection contexts.
+
+These components run in isolated environments. Sharing data or coordinating actions between them traditionally requires manually sending messages back and forth using APIs like `chrome.runtime.sendMessage` and setting up listeners (`chrome.runtime.onMessage`). This can quickly lead to complex, hard-to-debug "spaghetti code" as your extension grows.
+
+## The Solution: How Crann Simplifies Synchronization
+
+Crann acts as a central state management hub, typically initialized in your service worker. It provides a single source of truth for your shared data. Other contexts connect to this hub, allowing them to easily read state, update it, and subscribe to changes.
+
+**Visualizing the Problem: Manual Message Passing vs. Crann's Centralized State**
+
+![with_messages](img/with_messages.png)
+_Traditional message passing requires complex, bidirectional communication between all parts._
+
+![with_crann](img/with_crann.png)
+_Crann's centralized state management simplifies the architecture by eliminating the need for manual message passing._
+
+This dramatically simplifies your architecture:
+
+- **No more manual messaging:** Crann handles the communication internally.
+- **Single source of truth:** State is managed centrally.
+- **Reactivity:** Components automatically react to state changes they care about.
+
+### Quick Start: A Simple Synchronization Example
+
+Let's see how easy it is. Imagine we want a toggle in the popup to control whether a border is applied to the current web page by a content script.
+
+**1. Define the state in your Service Worker:**
 
 ```typescript
-// service worker environment
-import { create } from 'crann'
+// service-worker.ts
+import { create } from "crann";
 
-// Create an state with some defaults
 const crann = create({
-    active: {default: false} // types are inferred from provided default
-    trees: {default: 0}
-    name: {default: '', partition: Partition.Instance} // partitioned state will be different for each connected context, so everyone connected except the service worker
+  isBorderEnabled: { default: false }, // Single shared state item
 });
 
-// Get the state whenever you like.
-const {active, trees} =  crann.get() // Not passing in a key will only get state that is service to all, aka no partitioned state
-const {active, trees, name} = crann.get('instancekey') // Passing in a key will return the service state AND the partitioned state for that instance
-
-// subscribe to listen for state changes
-crann.subscribe( (state, changes, key) => {
-    const { active, trees, name } = state;
-    console.log('Service state: active: ', active, ', trees: ', trees);
-    console.log(`Instance state for ${key}: `, name);
-    // or just look at changes.
-
-    // key will be the id of the context that made the state update, or null if the update came from the service worker (here)
-});
-
-// Set the state (either for an instance or for the service state)
-crann.set({active: true}) // Will notify all connected contexts that active is now true.
-crann.set({name: 'ContentScript'}, 'instancekey'); // Or set for a particular instance if you like
+console.log("Crann hub initialized.");
+// Keep the service worker alive if needed (e.g., using chrome.runtime.connect)
+// Crann itself doesn't automatically keep the SW alive.
 ```
 
-### Then, connect to your Crann instance from any context you like -- eg. content scripts
+**2. Control the state from your Popup:**
 
 ```typescript
+// popup.ts
 import { connect } from "crann";
+
+const { set, get } = connect(); // Connect to the Crann hub
+
+const toggleButton = document.getElementById("toggleBorder");
+
+// Set initial button state
+const currentState = get();
+toggleButton.textContent = currentState.isBorderEnabled
+  ? "Disable Border"
+  : "Enable Border";
+
+// Add click listener to update state
+toggleButton.addEventListener("click", () => {
+  const newState = !get().isBorderEnabled; // Get current state before setting
+  set({ isBorderEnabled: newState });
+  // Update button text immediately (or subscribe to changes)
+  toggleButton.textContent = newState ? "Disable Border" : "Enable Border";
+});
+```
+
+**3. React to the state in your Content Script:**
+
+```typescript
+// content-script.ts
+import { connect } from "crann";
+
+const { subscribe } = connect(); // Connect to the Crann hub
+
+console.log("Content script connected to Crann.");
+
+// Subscribe to changes in 'isBorderEnabled'
+subscribe(
+  (state) => {
+    console.log("Border state changed:", state.isBorderEnabled);
+    document.body.style.border = state.isBorderEnabled ? "5px solid green" : "";
+  },
+  ["isBorderEnabled"]
+); // Optional: Only trigger for specific key changes
+
+// Apply initial state
+const initialState = connect().get(); // Can call connect() again or store result
+document.body.style.border = initialState.isBorderEnabled
+  ? "5px solid green"
+  : "";
+```
+
+**Notice:** We achieved synchronization between the popup and content script _without writing any `chrome.runtime.sendMessage` or `chrome.runtime.onMessage` code!_ Crann handled the communication behind the scenes.
+
+## Getting Started: Core Usage
+
+### Step 1: Create the State Hub (Service Worker)
+
+The service worker is where you initialize your shared state. Here's a more detailed example showing how to define different types of state:
+
+```typescript
+// service-worker.ts
+import { create, Partition, Persistence } from "crann";
+
+const crann = create({
+  // Basic state with default value
+  active: { default: false },
+
+  // State that's unique to each context
+  name: {
+    default: "",
+    partition: Partition.Instance,
+  },
+
+  // State that persists between sessions
+  timesUsed: {
+    default: 0,
+    persistence: Persistence.Local,
+  },
+
+  // State that resets when the browser closes
+  sessionStart: {
+    default: new Date(),
+    persistence: Persistence.Session,
+  },
+});
+
+// Get shared state (no instance state)
+const { active, timesUsed } = crann.get();
+
+// Optionally: Get state for a specific instance (includes instance state)
+const { active, timesUsed, name } = crann.get("instanceKey");
+
+// Subscribe to state changes
+crann.subscribe((state, changes, key) => {
+  // state contains all state (shared + relevant partition)
+  // changes contains only the keys that changed
+  // key identifies which context made the change (null if from service worker)
+  console.log("State changed:", changes);
+});
+```
+
+### Step 2: Connect from Other Contexts
+
+Other parts of your extension connect to the state hub. They automatically get access to both shared and their own partitioned state:
+
+```typescript
+// popup.ts or content-script.ts
+import { connect } from "crann";
+
 const { get, set, subscribe } = connect();
 
-// Similar to the service worker environment, except we will always be dealing with service state AND our own instance state. No distinction from our point of view.
-const { active, trees, name } = get();
+// Get all state (shared + this context's partition)
+const { active, name, timesUsed } = get();
 
-// Set the state
-set({ name: "My own name" });
+// Set state
+set({ name: "My Context's Name" });
 
-// subscribe to listen for a particular item of state changing, or any change
+// Subscribe to specific state changes
 subscribe(
   (changes) => {
-    console.log("Trees changed! new value: ", changes.trees);
+    console.log("Times used changed:", changes.timesUsed);
   },
-  ["trees"]
+  ["timesUsed"]
 );
 ```
 
-### Finally, Persist state!
+## Advanced Features
 
-You can persist items so that they will survive a refresh or context closure.
+### Handling Complex Types
 
-Session state: Will last between page refreshes, generally will reset if the user closes the tab or browser.
-Local state: Will persist long-term (unless the user specifically clears it in browser settings)
+Sometimes the default value alone isn't enough for TypeScript to infer the full type. Use type assertions to specify the complete type:
 
 ```typescript
-// Simply add persistence to your config when creating crann in the service-worker
+import { create } from "crann";
+
+// Example 1: Custom object type with null default
+type CustomType = { name: string; age: number };
+
+// Example 2: Specific string literal union
+type ConnectionStatus = "idle" | "connecting" | "connected" | "error";
 
 const crann = create({
-    active: {default: false} // types are inferred from provided default
-    trees: {default: 0}
-    name: {default: '', partition: Partition.Instance} // partitioned state will be different for each connected context, so everyone connected except the service worker
-    timesUsed: {default: 0, Persistence.Local}
-    firstOpened: {default: new Date(), Persistence.Session}
+  person: {
+    default: null as null | CustomType,
+  },
+  connectionStatus: {
+    default: "idle" as ConnectionStatus,
+  },
+  userStatus: {
+    default: "active" as "active" | "inactive",
+    persistence: Persistence.Local,
+  },
 });
 
-// note: Persisted state is Service state by default (shared with all contexts)
+// Now TypeScript understands the full potential types
+const state = crann.get();
+// state.person could be null or { name: string; age: number }
+// state.connectionStatus could be 'idle', 'connecting', 'connected', or 'error'
+```
+
+### Understanding Partitioned State
+
+Partitioned state (`Partition.Instance`) is useful when you want each context to have its own version of a state variable. For example:
+
+- Each content script might need its own `selectedElement` state
+- Each popup might need its own `isOpen` state
+- Each devtools panel might need its own `activeTab` state
+
+The service worker can access any context's partitioned state using `get('instanceKey')`, but typically you'll let each context manage its own partitioned state.
+
+### State Persistence Options
+
+Crann offers two levels of persistence:
+
+- **Session Storage** (`Persistence.Session`): State persists between page refreshes but resets when the browser closes
+- **Local Storage** (`Persistence.Local`): State persists long-term until explicitly cleared
+
+```typescript
+const crann = create({
+  // Will be remembered between browser sessions
+  userPreferences: {
+    default: { theme: "light" },
+    persistence: Persistence.Local,
+  },
+
+  // Will reset when browser closes
+  currentSession: {
+    default: { startTime: new Date() },
+    persistence: Persistence.Session,
+  },
+});
+```
+
+Remember: Persisted state is always shared state (not partitioned).
+
+### Advanced API Functions
+
+Crann provides additional functions for monitoring and managing instance connections:
+
+```typescript
+// In the service worker
+const crann = create({
+  // ... state configuration
+});
+
+// Listen for new instance connections
+crann.onInstanceConnect((instanceKey) => {
+  console.log(`New instance connected: ${instanceKey}`);
+  // You can access this instance's partitioned state
+  const instanceState = crann.get(instanceKey);
+});
+
+// Listen for instance disconnections
+crann.onInstanceDisconnect((instanceKey) => {
+  console.log(`Instance disconnected: ${instanceKey}`);
+  // Clean up any resources associated with this instance
+});
+
+// Get a list of all currently connected instances
+const connectedInstances = crann.getConnectedInstances();
+console.log("Connected instances:", connectedInstances);
+
+// In any context (including service worker)
+const { getInstanceKey } = connect();
+// Get this context's unique instance key
+const myInstanceKey = getInstanceKey();
+```
+
+These functions are particularly useful for:
+
+- Tracking which content scripts are currently active
+- Cleaning up resources when instances disconnect
+- Debugging connection issues
+- Managing instance-specific resources in the service worker
+
+The `getInstanceKey()` function is available in all contexts and can be useful for:
+
+- Logging and debugging
+- Coordinating with other systems that need to identify specific instances
+- Managing instance-specific resources
+
+### React Integration
+
+Crann provides a custom React hook for easy integration with React applications. This is particularly useful when you have a React app running in an iframe injected by your content script.
+
+```typescript
+// In your React component
+import { useCrann } from "crann";
+
+function MyReactComponent() {
+  // The hook returns the same interface as connect()
+  const { get, set, subscribe } = useCrann();
+
+  // Get the current state
+  const { isEnabled, count } = get();
+
+  // Set state (triggers re-render)
+  const toggleEnabled = () => {
+    set({ isEnabled: !isEnabled });
+  };
+
+  // Subscribe to specific state changes
+  subscribe(
+    (changes) => {
+      console.log("Count changed:", changes.count);
+    },
+    ["count"]
+  );
+
+  return (
+    <div>
+      <button onClick={toggleEnabled}>
+        {isEnabled ? "Disable" : "Enable"}
+      </button>
+      <p>Count: {count}</p>
+    </div>
+  );
+}
+```
+
+The `useCrann` hook provides the same functionality as `connect()`, but with React-specific optimizations:
+
+- Automatically re-renders components when subscribed state changes
+- Handles cleanup of subscriptions when components unmount
+- Provides TypeScript support for your state types
+
+#### Using with TypeScript
+
+For better type safety, you can create a custom hook that includes your state types:
+
+```typescript
+// types.ts
+interface MyState {
+  isEnabled: boolean;
+  count: number;
+  user: {
+    name: string;
+    age: number;
+  } | null;
+}
+
+// hooks.ts
+import { useCrann } from "crann";
+import type { MyState } from "./types";
+
+export function useMyCrann() {
+  return useCrann<MyState>();
+}
+
+// MyComponent.tsx
+import { useMyCrann } from "./hooks";
+
+function MyComponent() {
+  const { get, set } = useMyCrann();
+
+  // TypeScript now knows the shape of your state
+  const { user } = get();
+
+  const updateUser = () => {
+    set({
+      user: {
+        name: "Alice",
+        age: 30,
+      },
+    });
+  };
+
+  return (
+    <div>
+      {user && <p>Hello, {user.name}!</p>}
+      <button onClick={updateUser}>Update User</button>
+    </div>
+  );
+}
+```
+
+#### Performance Considerations
+
+The `useCrann` hook is optimized for React usage:
+
+- Only re-renders when subscribed state actually changes
+- Batches multiple state updates to minimize re-renders
+- Automatically cleans up subscriptions on unmount
+- Supports selective subscription to specific state keys
+
+For best performance:
+
+1. Subscribe only to the state keys your component needs
+2. Use the second parameter of `subscribe` to specify which keys to listen for
+3. Consider using `useMemo` for derived state
+4. Use `useCallback` for event handlers that update state
+
+```typescript
+function OptimizedComponent() {
+  const { get, set, subscribe } = useCrann();
+  const { items, filter } = get();
+
+  // Only re-render when items or filter changes
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => item.includes(filter));
+  }, [items, filter]);
+
+  // Memoize the handler
+  const handleFilterChange = useCallback(
+    (newFilter: string) => {
+      set({ filter: newFilter });
+    },
+    [set]
+  );
+
+  // Only subscribe to the keys we care about
+  subscribe(
+    (changes) => {
+      console.log("Filter changed:", changes.filter);
+    },
+    ["filter"]
+  );
+
+  return (
+    <div>
+      <input
+        value={filter}
+        onChange={(e) => handleFilterChange(e.target.value)}
+      />
+      <ul>
+        {filteredItems.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 ```
