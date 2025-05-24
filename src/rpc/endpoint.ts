@@ -6,11 +6,6 @@ import type {
   EncodingStrategy,
   EncodingStrategyApi,
   Retainer,
-  CallMessage,
-  ResultMessage,
-  ErrorMessage,
-  ReleaseMessage,
-  RPCMessage,
 } from "./types";
 import { StackFrame } from "./memory";
 
@@ -23,8 +18,21 @@ const FUNCTION_RESULT = 6;
 
 type AnyFunction = (...args: any[]) => any;
 
-export interface Endpoint<TActions extends ActionsConfig<any>> {
-  readonly call: RemoteCallable<TActions>;
+type MessageType = {
+  call: { id: string; args: unknown[] };
+  result: { id: string; result: unknown };
+  error: { id: string; error: string };
+  release: { id: string };
+};
+
+export interface CreateEndpointOptions<T = unknown> {
+  uuid?(): string;
+  createEncoder?(api: EncodingStrategyApi): EncodingStrategy;
+  callable?: (keyof T)[];
+}
+
+export interface Endpoint<T> {
+  readonly call: RemoteCallable<T>;
   replace(messenger: MessageEndpoint): void;
   expose(api: Record<string, AnyFunction | undefined>): void;
   callable(...methods: string[]): void;
@@ -32,18 +40,27 @@ export interface Endpoint<TActions extends ActionsConfig<any>> {
 }
 
 /**
- * Creates an RPC endpoint for communication between content scripts and service workers.
+ * An endpoint wraps around a messenger, acting as the intermediary for all
+ * messages both send from, and received by, that messenger. The endpoint sends
+ * all messages as arrays, where the first element is the message type, and the
+ * second is the arguments for that message (as an array). For messages that send
+ * meaningful content across the wire (e.g., arguments to function calls, return
+ * results), the endpoint first encodes these values.
  *
- * This endpoint handles sending and receiving messages with proper discriminators:
- * - call: Invokes an action on the remote side
- * - result: Returns a successful result
- * - error: Returns an error
- * - release: Releases memory references
+ * Encoding is done using a CBOR-like encoding scheme. The value is encoded into
+ * an array buffer, and is paired with an additional array buffer that contains all
+ * the strings used in that message (in the encoded value, strings are encoded as
+ * their index in the "strings" encoding to reduce the cost of heavily-duplicated
+ * strings, which is more likely in payloads containing UI). This encoding also takes
+ * care of encoding functions: it uses a "tagged" item in CBOR to represent a
+ * function as a string ID, which the opposite endpoint will be capable of turning
+ * into a consistent, memory-manageable function proxy.
  *
- * @param messenger The message endpoint for communication
- * @param state The current state available to handlers
- * @param actions Map of action handlers to execute
- * @returns A proxy object that sends RPC calls
+ * The main CBOR encoding is entirely take from the [cbor.js package](https://github.com/paroga/cbor-js).
+ * The special behavior for encoding strings and functions was then added in to the
+ * encoder and decoder. For additional details on CBOR:
+ *
+ * @see https://tools.ietf.org/html/rfc7049
  */
 export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
   messenger: MessageEndpoint,
@@ -54,22 +71,29 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
   const callbacks = new Map<number, (result: unknown) => void>();
   const retainedObjects = new Map<string, Set<Retainer>>();
 
-  console.log("[Crann:RPC] Creating endpoint");
+  // State update function that will be passed to action handlers
+  const setState = async (newState: Partial<TState>) => {
+    // This is a stub - in the real implementation, this needs to be connected
+    // to the actual state update mechanism
+    Object.assign(state as object, newState);
+    return Promise.resolve();
+  };
+
   messenger.addEventListener("message", (event) => {
-    const [id, message] = event.data as [number, RPCMessage];
-    console.log("[Crann:RPC] Received message:", message);
+    const [id, message] = event.data as [
+      number,
+      MessageType[keyof MessageType]
+    ];
 
-    if ("call" in message) {
-      const { id: callId, args, target } = message.call;
-      console.log(`[Crann:RPC] Processing RPC call: ${callId}`, args);
-
+    if ("call" in message && "args" in message) {
+      const callMessage = message as MessageType["call"];
+      const { id: callId, args } = callMessage;
       const action = actions[callId];
       if (!action) {
-        console.warn(`[Crann:RPC] Action not found: ${callId}`);
-        const errorMessage: ErrorMessage = {
-          error: { id: callId, error: "Action not found" },
-        };
-        messenger.postMessage([id, errorMessage]);
+        messenger.postMessage([
+          id,
+          { id: callId, error: "Action not found" },
+        ] as [number, MessageType["error"]]);
         return;
       }
 
@@ -77,59 +101,55 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
         if (action.validate) {
           action.validate(...args);
         }
-        console.log(`[Crann:RPC] Executing handler for: ${callId}`);
-        action.handler(state, ...args).then(
-          (result) => {
-            console.log(`[Crann:RPC] Action completed: ${callId}`, result);
-            const resultMessage: ResultMessage = {
-              result: { id: callId, result, target },
-            };
-            messenger.postMessage([id, resultMessage]);
+
+        // Handle both synchronous and asynchronous results
+        Promise.resolve(action.handler(state, setState, ...args)).then(
+          (result: unknown) => {
+            messenger.postMessage([id, { id: callId, result }] as [
+              number,
+              MessageType["result"]
+            ]);
           },
           (error: Error) => {
-            console.error(`[Crann:RPC] Action failed: ${callId}`, error);
-            const errorMessage: ErrorMessage = {
-              error: { id: callId, error: error.message, target },
-            };
-            messenger.postMessage([id, errorMessage]);
+            messenger.postMessage([
+              id,
+              { id: callId, error: error.message },
+            ] as [number, MessageType["error"]]);
           }
         );
       } catch (error) {
-        console.error(`[Crann:RPC] Action threw error: ${callId}`, error);
-        const errorMessage: ErrorMessage = {
-          error: {
-            id: callId,
-            error:
-              error instanceof Error ? error.message : "Unknown error occurred",
-          },
-        };
-        messenger.postMessage([id, errorMessage]);
+        if (error instanceof Error) {
+          messenger.postMessage([id, { id: callId, error: error.message }] as [
+            number,
+            MessageType["error"]
+          ]);
+        } else {
+          messenger.postMessage([
+            id,
+            { id: callId, error: "Unknown error occurred" },
+          ] as [number, MessageType["error"]]);
+        }
       }
     } else if ("result" in message) {
-      const { id: resultId, result } = message.result;
-      console.log(`[Crann:RPC] Received result: ${resultId}`, result);
-
+      const resultMessage = message as MessageType["result"];
       const callback = callbacks.get(id);
       if (callback) {
-        callback(result);
+        callback(resultMessage.result);
         callbacks.delete(id);
       }
     } else if ("error" in message) {
-      const { id: errorId, error } = message.error;
-      console.error(`[Crann:RPC] Received error: ${errorId}`, error);
-
+      const errorMessage = message as MessageType["error"];
       const callback = callbacks.get(id);
       if (callback) {
-        callback(Promise.reject(new Error(error)));
+        callback(Promise.reject(new Error(errorMessage.error)));
         callbacks.delete(id);
       }
     } else if ("release" in message) {
-      const { id: releaseId } = message.release;
-
-      const retainers = retainedObjects.get(releaseId);
+      const releaseMessage = message as MessageType["release"];
+      const retainers = retainedObjects.get(releaseMessage.id);
       if (retainers) {
         retainers.clear();
-        retainedObjects.delete(releaseId);
+        retainedObjects.delete(releaseMessage.id);
       }
     }
   });
@@ -138,8 +158,6 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
     get(_, prop: string) {
       return (...args: unknown[]) => {
         const id = Math.random();
-        console.log(`[Crann:RPC] Creating call: ${String(prop)}`, args);
-
         return new Promise((resolve, reject) => {
           callbacks.set(id, (result) => {
             if (result instanceof Promise) {
@@ -148,16 +166,69 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
               resolve(result);
             }
           });
-
-          // Add the 'call' discriminator to the message
-          const callMessage: CallMessage = {
-            call: { id: String(prop), args },
-          };
-          messenger.postMessage([id, callMessage]);
+          messenger.postMessage([id, { id: prop, args }] as [
+            number,
+            MessageType["call"]
+          ]);
         });
       };
     },
   });
 
   return proxy;
+}
+
+function defaultUuid() {
+  return `${uuidSegment()}-${uuidSegment()}-${uuidSegment()}-${uuidSegment()}`;
+}
+
+function uuidSegment() {
+  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(16);
+}
+
+function createCallable<T>(
+  handlerForCall: (
+    property: string | number | symbol
+  ) => AnyFunction | undefined,
+  callable?: (keyof T)[]
+): RemoteCallable<T> {
+  let call: any;
+
+  if (callable == null) {
+    if (typeof Proxy !== "function") {
+      throw new Error(
+        `You must pass an array of callable methods in environments without Proxies.`
+      );
+    }
+
+    const cache = new Map<string | number | symbol, AnyFunction | undefined>();
+
+    call = new Proxy(
+      {},
+      {
+        get(_target, property) {
+          if (cache.has(property)) {
+            return cache.get(property);
+          }
+
+          const handler = handlerForCall(property);
+          cache.set(property, handler);
+          return handler;
+        },
+      }
+    );
+  } else {
+    call = {};
+
+    for (const method of callable) {
+      Object.defineProperty(call, method, {
+        value: handlerForCall(method),
+        writable: false,
+        configurable: true,
+        enumerable: true,
+      });
+    }
+  }
+
+  return call;
 }

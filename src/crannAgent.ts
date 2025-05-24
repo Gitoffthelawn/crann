@@ -90,11 +90,10 @@ export function connect<TConfig extends AnyConfig>(
   const rpcEndpoint = createCrannRPCAdapter(
     getDerivedState(config),
     actions,
-    porter,
-    "agent"
+    porter
   );
 
-  porter.onMessage({
+  porter.on({
     initialState: (message) => {
       _state = message.payload.state;
       _myInfo = message.payload.info;
@@ -104,6 +103,7 @@ export function connect<TConfig extends AnyConfig>(
       log(`Initial state received and  ${listeners.size} listeners notified`, {
         message,
       });
+
       readyCallbacks.forEach((callback) => callback(connectionStatus));
       listeners.forEach((listener) => {
         listener.callback(_state);
@@ -204,6 +204,7 @@ export function connect<TConfig extends AnyConfig>(
   const getAgentInfo = () => _myInfo;
 
   const callAction = async (name: string, ...args: any[]) => {
+    console.log("MOC Calling action", name, args);
     return (rpcEndpoint as any)[name](...args);
   };
 

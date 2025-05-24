@@ -9,7 +9,6 @@ function createTestUI() {
   container.style.right = "10px";
   container.style.padding = "10px";
   container.style.backgroundColor = "white";
-  container.style.color = "black";
   container.style.border = "1px solid #ccc";
   container.style.borderRadius = "5px";
   container.style.zIndex = "10000";
@@ -22,29 +21,22 @@ function createTestUI() {
   const incrementButton = document.createElement("button");
   incrementButton.textContent = "Increment by 1";
   incrementButton.style.margin = "5px";
-  incrementButton.style.color = "black";
   incrementButton.style.cursor = "pointer";
   container.appendChild(incrementButton);
 
   const timeButton = document.createElement("button");
   timeButton.textContent = "Get Current Time";
   timeButton.style.margin = "5px";
-  timeButton.style.color = "black";
   container.appendChild(timeButton);
 
   const fetchButton = document.createElement("button");
   fetchButton.textContent = "Fetch Data";
   fetchButton.style.margin = "5px";
-  fetchButton.style.color = "black";
-  fetchButton.style.cursor = "pointer";
   container.appendChild(fetchButton);
 
   const resultDisplay = document.createElement("div");
   resultDisplay.id = "result-display";
   resultDisplay.style.marginTop = "10px";
-  resultDisplay.style.color = "black";
-  resultDisplay.style.cursor = "pointer";
-  resultDisplay.style.height = "40px";
   container.appendChild(resultDisplay);
 
   document.body.appendChild(container);
@@ -54,7 +46,6 @@ function createTestUI() {
       counterDisplay.textContent = `Counter: ${value}`;
     },
     updateResult: (text: string) => {
-      console.log("Updating result", text);
       resultDisplay.textContent = text;
     },
     incrementButton,
@@ -65,11 +56,12 @@ function createTestUI() {
 
 // Initialize Crann and UI
 const [useCrann, get, set, subscribe, getAgentInfo, onReady, callAction] =
-  connect(config);
+  connect(config, { debug: true });
 const ui = createTestUI();
 
 // Wait for connection
 onReady((status) => {
+  console.log("MOC onReady", status);
   if (status.connected) {
     console.log("Connected to Crann");
 
@@ -82,14 +74,11 @@ onReady((status) => {
 
     // Set up button handlers
     ui.incrementButton.addEventListener("click", async () => {
-      console.log("incrementButton click");
       try {
-        console.log("Trying result");
+        console.log("incrementButton click");
         const result = await callAction("increment", 1);
-        console.log("Updating result");
-        ui.updateResult(`Incremented counter to ${result.counter}`);
+        ui.updateResult(`Increment counter to ${result.timesUsed}`);
       } catch (error) {
-        console.log("RPC Error", error);
         if (error instanceof Error) {
           ui.updateResult(`Error: ${error.message}`);
         } else {

@@ -25,9 +25,14 @@ export const config = {
 
   // RPC action example
   increment: {
-    handler: async (state: any, amount: number) => {
-      console.log("incrementing", amount);
-      return { timesUsed: state.timesUsed + amount };
+    handler: async (
+      state: any,
+      setState: (newState: Partial<any>) => Promise<void>,
+      amount: number
+    ) => {
+      const newValue = state.timesUsed + amount;
+      await setState({ timesUsed: newValue });
+      return newValue;
     },
     validate: (amount: number) => {
       if (amount < 0) throw new Error("Amount must be positive");

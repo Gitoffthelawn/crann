@@ -53,7 +53,7 @@ export class Crann<TConfig extends AnyConfig> {
     this.defaultServiceState = this.serviceState =
       this.initializeServiceDefault();
     this.hydrate();
-    this.porter.onMessage({
+    this.porter.on({
       setState: (message, info) => {
         if (!info) {
           this.log("setState message heard from unknown agent");
@@ -107,12 +107,7 @@ export class Crann<TConfig extends AnyConfig> {
 
     // Initialize RPC with actions
     const actions = this.extractActions(config);
-    this.rpcEndpoint = createCrannRPCAdapter(
-      this.get(),
-      actions,
-      this.porter,
-      "service"
-    );
+    this.rpcEndpoint = createCrannRPCAdapter(this.get(), actions, this.porter);
   }
 
   public static getInstance<TConfig extends AnyConfig>(

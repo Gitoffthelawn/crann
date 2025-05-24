@@ -2,60 +2,36 @@ export type MessageMap = {
   call: {
     id: string;
     args: any[];
-    target?: any; // Missing target property
   };
   result: {
     id: string;
     result: any;
-    target?: any; // Missing target property
   };
   error: {
     id: string;
     error: string;
-    target?: any; // Missing target property
   };
   release: {
     id: string;
-    target?: any; // Missing target property
   };
 };
 
-// Then export these message type definitions
-export type CallMessage = {
-  call: MessageMap["call"];
-};
-
-export type ResultMessage = {
-  result: MessageMap["result"];
-};
-
-export type ErrorMessage = {
-  error: MessageMap["error"];
-};
-
-export type ReleaseMessage = {
-  release: MessageMap["release"];
-};
-
-// And the union type
-export type RPCMessage =
-  | CallMessage
-  | ResultMessage
-  | ErrorMessage
-  | ReleaseMessage;
-
 export interface MessageEndpoint {
-  postMessage(
-    message: [number, RPCMessage],
+  postMessage<T extends MessageMap[keyof MessageMap]>(
+    message: [number, T],
     transferables?: Transferable[]
   ): void;
   addEventListener(
     event: "message",
-    listener: (event: MessageEvent<[number, RPCMessage]>) => void
+    listener: (
+      event: MessageEvent<[number, MessageMap[keyof MessageMap]]>
+    ) => void
   ): void;
   removeEventListener(
     event: "message",
-    listener: (event: MessageEvent<[number, RPCMessage]>) => void
+    listener: (
+      event: MessageEvent<[number, MessageMap[keyof MessageMap]]>
+    ) => void
   ): void;
   terminate?(): void;
 }
