@@ -8,17 +8,22 @@ import {
   UseCrann,
   ConnectionStatus,
   StateChangeUpdate,
+  ActionDefinition,
+  AnyConfig,
+  isStateItem,
+  isActionItem,
 } from "./model/crann.model";
 import {
   AgentInfo,
   connect as connectPorter,
   PorterContext,
 } from "porter-source";
+import { createCrannRPCAdapter } from "./rpc/adapter";
 
 let connectionStatus: ConnectionStatus = { connected: false };
 let crannInstance: unknown = null;
 
-export function connect<TConfig extends Record<string, ConfigItem<any>>>(
+export function connect<TConfig extends AnyConfig>(
   config: TConfig,
   options?: { context?: string; debug?: boolean }
 ): ConnectReturn<TConfig> {
@@ -51,20 +56,45 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
       instance[2],
       instance[3],
       instance[4],
-      (callback: (info: ConnectionStatus) => void) => {
-        console.log("[Crann:Agent] connect, adding onReady callback");
-        readyCallbacks.add(callback);
-        return () => readyCallbacks.delete(callback);
-      },
+      instance[5],
+      instance[6],
     ];
   }
 
   log("No existing instance, creating a new one");
-  const { post, onMessage } = connectPorter({
+  const porter = connectPorter({
     namespace: "crann",
   });
 
-  onMessage({
+  // Initialize RPC with empty actions since this is the client side
+  const actions = Object.entries(config)
+    .filter(([_, value]) => isActionItem(value))
+    .reduce<
+      Record<string, ActionDefinition<DerivedState<TConfig>, any[], any>>
+    >((acc, [key, value]) => {
+      const action = value as ActionDefinition<
+        DerivedState<TConfig>,
+        any[],
+        any
+      >;
+      return {
+        ...acc,
+        [key]: {
+          type: "action",
+          handler: action.handler,
+          validate: action.validate,
+        },
+      };
+    }, {});
+
+  const rpcEndpoint = createCrannRPCAdapter(
+    getDerivedState(config),
+    actions,
+    porter,
+    "agent"
+  );
+
+  porter.onMessage({
     initialState: (message) => {
       _state = message.payload.state;
       _myInfo = message.payload.info;
@@ -91,7 +121,6 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
         } else {
           const matchFound = listener.keys.some((key) => key in changes!);
           if (matchFound) {
-            // log("Found a specific listener for this item, notifying");
             listener.callback(changes!);
           }
         }
@@ -108,7 +137,7 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
   const get = () => _state;
   const set = (newState: Partial<DerivedState<TConfig>>) => {
     console.log("CrannAgent, calling post with setState");
-    post({ action: "setState", payload: { state: newState } });
+    porter.post({ action: "setState", payload: { state: newState } });
   };
 
   const subscribe = (
@@ -125,9 +154,17 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
   const useCrann: UseCrann<TConfig> = <K extends keyof DerivedState<TConfig>>(
     key: K
   ) => {
-    const getValue = () => get()[key] as DerivedState<TConfig>;
-    const setValue = (value: DerivedState<TConfig>[K]) =>
-      set({ [key]: value } as Partial<DerivedState<TConfig>>);
+    const getValue = () => {
+      const value = get()[key];
+      return value as TConfig[K] extends ConfigItem<any>
+        ? TConfig[K]["default"]
+        : never;
+    };
+
+    const setValue = (
+      value: TConfig[K] extends ConfigItem<any> ? TConfig[K]["default"] : never
+    ) => set({ [key]: value } as Partial<DerivedState<TConfig>>);
+
     const subscribeToChanges = (
       callback: (update: StateChangeUpdate<TConfig, K>) => void
     ) => {
@@ -142,7 +179,7 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
               current: currentValue,
               previous: previousValue,
               state: fullState,
-            });
+            } as StateChangeUpdate<TConfig, K>);
             previousValue = currentValue;
           }
         },
@@ -166,6 +203,10 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
 
   const getAgentInfo = () => _myInfo;
 
+  const callAction = async (name: string, ...args: any[]) => {
+    return (rpcEndpoint as any)[name](...args);
+  };
+
   const instance: ConnectReturn<TConfig> = [
     useCrann,
     get,
@@ -173,6 +214,7 @@ export function connect<TConfig extends Record<string, ConfigItem<any>>>(
     subscribe,
     getAgentInfo,
     onReady,
+    callAction,
   ];
   crannInstance = instance;
 
@@ -183,32 +225,19 @@ export function connected(): boolean {
   return crannInstance !== null;
 }
 
-function getDerivedState<TConfig extends Record<string, ConfigItem<any>>>(
+function getDerivedState<TConfig extends AnyConfig>(
   config: TConfig
 ): DerivedState<TConfig> {
-  const instanceState = {} as DerivedInstanceState<TConfig>;
-
+  const state: any = {};
   Object.keys(config).forEach((key) => {
-    const item: ConfigItem<any> = config[key];
-    if (item.partition === "instance") {
-      instanceState[key as keyof DerivedInstanceState<TConfig>] = item.default;
+    const item = config[key];
+    if (isStateItem(item)) {
+      state[key] = item.default;
     }
   });
-
-  const serviceState = {} as DerivedServiceState<TConfig>;
-  Object.keys(config).forEach((key) => {
-    const item: ConfigItem<any> = config[key];
-    if (item.partition === "service") {
-      serviceState[key as keyof DerivedServiceState<TConfig>] = item.default;
-    }
-  });
-
-  return {
-    ...instanceState,
-    ...serviceState,
-  } as unknown as DerivedState<TConfig>;
+  return state;
 }
 
-function getAgentTag(info: AgentInfo): string {
-  return `${info.location.context}:${info.location.tabId}:${info.location.frameId}`;
+function getAgentTag(agent: AgentInfo): string {
+  return `${agent.location.context}:${agent.location.tabId}:${agent.location.frameId}`;
 }
