@@ -118,15 +118,15 @@ type UseCrann<TConfig extends AnyConfig> = <
   (callback: (update: StateChangeUpdate<TConfig, K>) => void) => () => void
 ];
 
-type ConnectReturn<TConfig extends AnyConfig> = [
-  UseCrann<TConfig>,
-  CrannAgent<TConfig>["get"],
-  CrannAgent<TConfig>["set"],
-  CrannAgent<TConfig>["subscribe"],
-  CrannAgent<TConfig>["getAgentInfo"],
-  CrannAgent<TConfig>["onReady"],
-  (name: string, ...args: any[]) => Promise<any>
-];
+type ConnectReturn<TConfig extends AnyConfig> = {
+  useCrann: UseCrann<TConfig>;
+  get: CrannAgent<TConfig>["get"];
+  set: CrannAgent<TConfig>["set"];
+  subscribe: CrannAgent<TConfig>["subscribe"];
+  getAgentInfo: CrannAgent<TConfig>["getAgentInfo"];
+  onReady: CrannAgent<TConfig>["onReady"];
+  callAction: (name: string, ...args: any[]) => Promise<any>;
+};
 
 type StateChangeUpdate<
   TConfig extends AnyConfig,

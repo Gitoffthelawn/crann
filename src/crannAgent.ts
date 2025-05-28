@@ -49,22 +49,15 @@ export function connect<TConfig extends AnyConfig>(
         readyCallbacks.forEach((callback) => callback(connectionStatus));
       }, 0);
     }
-    const instance = crannInstance as ConnectReturn<TConfig>;
-    return [
-      instance[0],
-      instance[1],
-      instance[2],
-      instance[3],
-      instance[4],
-      instance[5],
-      instance[6],
-    ];
+    return crannInstance as ConnectReturn<TConfig>;
   }
 
   log("No existing instance, creating a new one");
   const porter = connectPorter({
     namespace: "crann",
   });
+
+  console.log("[DEBUG] Porter connection created");
 
   // Initialize RPC with empty actions since this is the client side
   const actions = Object.entries(config)
@@ -93,8 +86,22 @@ export function connect<TConfig extends AnyConfig>(
     porter
   );
 
+  let initialStateReceived = false;
+
   porter.on({
     initialState: (message) => {
+      console.log("[DEBUG] initialState received", {
+        alreadyReceived: initialStateReceived,
+        payload: message.payload,
+      });
+
+      if (initialStateReceived) {
+        console.log("[DEBUG] Ignoring duplicate initialState message");
+        return;
+      }
+
+      initialStateReceived = true;
+
       _state = message.payload.state;
       _myInfo = message.payload.info;
       _myTag = getAgentTag(_myInfo);
@@ -104,7 +111,10 @@ export function connect<TConfig extends AnyConfig>(
         message,
       });
 
-      readyCallbacks.forEach((callback) => callback(connectionStatus));
+      readyCallbacks.forEach((callback) => {
+        console.log("Calling onReady callbacks");
+        callback(connectionStatus);
+      });
       listeners.forEach((listener) => {
         listener.callback(_state);
       });
@@ -191,6 +201,7 @@ export function connect<TConfig extends AnyConfig>(
   };
 
   const onReady = (callback: (info: ConnectionStatus) => void) => {
+    console.log("[Crann:Agent], onReady callback added");
     readyCallbacks.add(callback);
     if (connectionStatus.connected) {
       console.log("[Crann:Agent], calling onReady callback");
@@ -208,7 +219,7 @@ export function connect<TConfig extends AnyConfig>(
     return (rpcEndpoint as any)[name](...args);
   };
 
-  const instance: ConnectReturn<TConfig> = [
+  const instance = {
     useCrann,
     get,
     set,
@@ -216,7 +227,8 @@ export function connect<TConfig extends AnyConfig>(
     getAgentInfo,
     onReady,
     callAction,
-  ];
+  };
+
   crannInstance = instance;
 
   return crannInstance as ConnectReturn<TConfig>;

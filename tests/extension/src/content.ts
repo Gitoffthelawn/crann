@@ -1,9 +1,11 @@
 import { connect } from "crann";
 import { config } from "./config";
+import { ConnectReturn } from "../../../dist/types/model/crann.model";
 
 // Create a simple UI to test our actions
 function createTestUI() {
   const container = document.createElement("div");
+  container.id = "crann-test-container";
   container.style.position = "fixed";
   container.style.top = "10px";
   container.style.right = "10px";
@@ -12,6 +14,36 @@ function createTestUI() {
   container.style.border = "1px solid #ccc";
   container.style.borderRadius = "5px";
   container.style.zIndex = "10000";
+
+  // Add a header with close button
+  const header = document.createElement("div");
+  header.style.display = "flex";
+  header.style.justifyContent = "space-between";
+  header.style.alignItems = "center";
+  header.style.marginBottom = "8px";
+
+  const title = document.createElement("span");
+  title.textContent = "Crann Test Panel";
+  title.style.fontWeight = "bold";
+  title.style.color = "black";
+
+  const closeButton = document.createElement("button");
+  closeButton.textContent = "✕";
+  closeButton.style.border = "none";
+  closeButton.style.background = "none";
+  closeButton.style.cursor = "pointer";
+  closeButton.style.fontSize = "16px";
+  closeButton.style.color = "#666";
+  closeButton.style.padding = "0 5px";
+
+  header.appendChild(title);
+  header.appendChild(closeButton);
+  container.appendChild(header);
+
+  // Add toggle functionality
+  closeButton.addEventListener("click", () => {
+    container.style.display = "none";
+  });
 
   const counterDisplay = document.createElement("div");
   counterDisplay.id = "counter-display";
@@ -57,8 +89,11 @@ function createTestUI() {
 }
 
 // Initialize Crann and UI
-const [useCrann, get, set, subscribe, getAgentInfo, onReady, callAction] =
+const { useCrann, get, set, subscribe, getAgentInfo, onReady, callAction } =
   connect(config, { debug: true });
+
+// const { post, on, getAgentInfo }: ConnectReturn<typeof config> =
+//   connect(config, { debug: true });
 const ui = createTestUI();
 
 // Wait for connection
@@ -70,6 +105,7 @@ onReady((status) => {
     // Subscribe to counter changes
     subscribe((changes) => {
       if ("timesUsed" in changes) {
+        console.log("timesUsed changed", changes.timesUsed);
         ui.updateCounter(changes.timesUsed as number);
       }
     });
@@ -121,6 +157,7 @@ onReady((status) => {
 
     // Set initial counter value
     const initialState = get();
+    console.log("Setting initial timesUsed: ", initialState.timesUsed);
     ui.updateCounter(initialState.timesUsed as number);
   } else {
     console.error("Failed to connect to Crann");

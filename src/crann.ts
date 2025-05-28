@@ -53,6 +53,8 @@ export class Crann<TConfig extends AnyConfig> {
     this.defaultServiceState = this.serviceState =
       this.initializeServiceDefault();
     this.hydrate();
+
+    this.log("Crann constructed, setting initial message handlers");
     this.porter.on({
       setState: (message, info) => {
         if (!info) {
@@ -65,11 +67,34 @@ export class Crann<TConfig extends AnyConfig> {
         this.set(message.payload.state, info.id);
       },
     });
+
+    // Track which agents we've already sent initialState to
+    const agentsInitialized = new Set<string>();
+
     this.porter.onMessagesSet((info: AgentInfo) => {
       if (!info) {
         this.error("Messages set but no agent info.", { info });
         return;
       }
+
+      console.log("[DEBUG] onMessagesSet received for agent:", {
+        id: info.id,
+        context: info.location.context,
+        tabId: info.location.tabId,
+        frameId: info.location.frameId,
+        alreadyInitialized: agentsInitialized.has(info.id),
+      });
+
+      // Skip sending initialState if we've already sent it to this agent
+      if (agentsInitialized.has(info.id)) {
+        console.log(
+          "[DEBUG] Already sent initialState to agent, skipping:",
+          info.id
+        );
+        return;
+      }
+
+      agentsInitialized.add(info.id);
 
       this.instanceLog(
         "Messages set received. Sending initial state.",

@@ -3,7 +3,7 @@ import { config } from "./config";
 import { PorterContext } from "porter-source";
 
 // Initialize Crann in the service worker
-const crann = create(config);
+const crann = create(config, { debug: true });
 
 // Subscribe to state changes
 crann.subscribe((state, changes, agent) => {
