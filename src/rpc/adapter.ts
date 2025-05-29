@@ -6,6 +6,8 @@ import {
   CallMessage,
   RPCMessage,
 } from "./types";
+import { Logger } from "../utils/logger";
+import { getAgentTag } from "../utils/agent";
 
 export function createCrannRPCAdapter<
   TState,
@@ -20,20 +22,21 @@ export function createCrannRPCAdapter<
   // Determine if this is a service worker instance (source) or content script instance (connect)
   const isServiceWorker = !(porterInstance.type === "agent");
 
+  // Set up logger with the appropriate context
+  const logger = Logger.forContext(isServiceWorker ? "Core:RPC" : "Agent:RPC");
+
   const messageEndpoint: MessageEndpoint = {
     postMessage: (message, transferables) => {
       if (isServiceWorker) {
-        console.log(
-          "MOC createCrannRPCAdapter, postMessage, isServiceWorker: ",
-          { porterInstance, message, transferables }
-        );
+        logger.debug("Posting message from service worker:", {
+          message,
+          transferables,
+        });
         // In service worker, we need to respond to the specific target
         const [, rpcPayload] = message;
         const target = getTargetFromMessage(rpcPayload);
         if (!target) {
-          console.warn(
-            "No target specified for RPC response in service worker"
-          );
+          logger.warn("No target specified for RPC response in service worker");
           return;
         }
         porterInstance.post(
@@ -51,6 +54,14 @@ export function createCrannRPCAdapter<
         // Get the agent info only when needed
         const agentInfo = (porterInstance as AgentAPI).getAgentInfo();
 
+        if (!agentInfo) {
+          logger.warn("No agent info found for posting message", { agentInfo });
+          return;
+        }
+
+        // Get the agent tag for logging
+        const myTag = getAgentTag(agentInfo);
+
         // Destructure the tuple, skipping the messageId which we don't need
         const [, rpcPayload] = message;
 
@@ -60,7 +71,7 @@ export function createCrannRPCAdapter<
           rpcPayload.call.target = agentInfo?.location;
         }
 
-        console.log("Crann[CS]: did we add target to call message? ", {
+        logger.withTag(myTag).debug("Sending RPC message from agent:", {
           rpcPayload,
           message,
         });
@@ -78,10 +89,20 @@ export function createCrannRPCAdapter<
       porterInstance.on({
         rpc: (message: Message<string>, info?: AgentInfo) => {
           try {
-            console.log("[CRANN] porterInstance, message heard, ", {
-              message,
-              event,
-            });
+            if (!info) {
+              logger.debug("RPC message received:", {
+                message,
+                event,
+              });
+            } else {
+              // Get the agent tag for logging
+              const myTag = getAgentTag(info);
+              logger.withTag(myTag).debug("RPC message received:", {
+                message,
+                event,
+              });
+            }
+
             const { payload } = message;
             const { message: originalMessage, transferables = [] } = payload;
             const rpcEvent = new MessageEvent("message", {
@@ -93,7 +114,7 @@ export function createCrannRPCAdapter<
             });
             listener(rpcEvent);
           } catch (e) {
-            console.error("Failed to parse RPC message payload:", e);
+            logger.error("Failed to parse RPC message payload:", e);
           }
         },
       });

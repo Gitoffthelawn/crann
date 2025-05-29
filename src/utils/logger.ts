@@ -57,9 +57,9 @@ export class Logger {
     const fullContext = this.getFullContext();
     const formatString = `%c${Logger.prefix}%c [%c${fullContext}%c]`;
 
-    // Styles for the prefix and context
-    const prefixStyle = "color: #4A90E2; font-weight: bold";
-    const contextStyle = "color: #7b1fa2; font-weight: bold"; // Purple
+    // Styles for the prefix and context - updated for better readability on dark backgrounds
+    const prefixStyle = "color: #3fcbff; font-weight: bold"; // Bright cyan
+    const contextStyle = "color: #d58cff; font-weight: bold"; // Bright purple
     const resetStyle = "";
 
     if (Logger.debug) {

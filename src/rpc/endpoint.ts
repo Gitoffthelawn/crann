@@ -11,6 +11,7 @@ import type {
   ErrorMessage,
   RPCMessage,
 } from "./types";
+import { Logger } from "../utils/logger";
 
 const CALL = 0;
 const RESULT = 1;
@@ -67,6 +68,9 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
   const callbacks = new Map<number, (result: unknown) => void>();
   const retainedObjects = new Map<string, Set<Retainer>>();
 
+  // Create logger - will be used in Service Worker or Agent context based on the messenger's context
+  const logger = Logger.forContext("RPC:Endpoint");
+
   // State update function that will be passed to action handlers
   const setState = async (newState: Partial<TState>) => {
     // This is a stub - in the real implementation, this needs to be connected
@@ -76,11 +80,11 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
   };
 
   messenger.addEventListener("message", (event) => {
-    console.log("[CRANN] endpoint, message heard, ", event);
+    logger.debug("Message received:", event);
     const [id, message] = event.data as [number, RPCMessage];
 
     if ("call" in message && "args" in message.call) {
-      console.log("[CRANN] call in message, and args in message", message);
+      logger.debug("Processing call message:", message);
       const callMessage = message.call;
       const { id: callId, args, target } = callMessage;
       const action = actions[callId];
@@ -102,7 +106,7 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
         // Handle both synchronous and asynchronous results
         Promise.resolve(action.handler(state, setState, ...args)).then(
           (result: unknown) => {
-            console.log("[CRANN] Result from action handler, with target: ", {
+            logger.debug("Action handler result:", {
               result,
               target,
             });

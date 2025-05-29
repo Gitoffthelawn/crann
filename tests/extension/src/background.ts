@@ -14,10 +14,10 @@ crann.subscribe((state, changes, agent) => {
 });
 
 // Subscribe to instance ready events
-crann.onInstanceReady((instanceId, agent) => {
-  console.log("New instance ready:", instanceId);
-  console.log("Agent info:", agent);
-});
+// crann.onInstanceReady((agent) => {
+//   console.log("New instance ready:", agent);
+//   console.log("Agent info:", agent);
+// });
 
 // Example of finding an instance
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -27,9 +27,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       tabId,
       frameId: 0,
     });
-    if (instanceId) {
-      console.log("Found instance for tab:", instanceId);
-    }
   }
 });
 
