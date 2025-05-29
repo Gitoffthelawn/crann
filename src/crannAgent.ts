@@ -2,8 +2,6 @@ import {
   ConfigItem,
   DerivedState,
   StateSubscriber,
-  DerivedInstanceState,
-  DerivedServiceState,
   ConnectReturn,
   UseCrann,
   ConnectionStatus,
@@ -13,13 +11,10 @@ import {
   isStateItem,
   isActionItem,
 } from "./model/crann.model";
-import {
-  AgentInfo,
-  connect as connectPorter,
-  PorterContext,
-} from "porter-source";
+import { AgentInfo, connect as connectPorter } from "porter-source";
 import { createCrannRPCAdapter } from "./rpc/adapter";
 import { Logger } from "./utils/logger";
+import { getAgentTag } from "./utils/agent";
 
 let connectionStatus: ConnectionStatus = { connected: false };
 let crannInstance: unknown = null;
@@ -36,24 +31,19 @@ export function connect<TConfig extends AnyConfig>(
     Logger.setDebug(true);
   }
   const logger = Logger.forContext("Agent");
-  logger.log("Testing new logger in crannAgent");
 
   let _myInfo: AgentInfo;
   let _myTag = "unset";
-  const log = (message: string, ...args: any[]) => {
-    if (debug) {
-      console.log(`CrannAgent [${_myTag}] ` + message, ...args);
-    }
-  };
-
   const readyCallbacks = new Set<(info: ConnectionStatus) => void>();
 
-  log("Initializing with context: ", context);
+  logger.log(
+    "Initializing Crann Agent" + (context ? ` with context: ${context}` : "")
+  );
   if (crannInstance) {
-    log("We had an instance already, returning");
+    logger.log("We had an instance already, returning");
 
     if (connectionStatus.connected) {
-      console.log("[Crann:Agent] connect, calling onReady callback");
+      logger.log("Connect, calling onReady callback");
       setTimeout(() => {
         readyCallbacks.forEach((callback) => callback(connectionStatus));
       }, 0);
@@ -61,12 +51,13 @@ export function connect<TConfig extends AnyConfig>(
     return crannInstance as ConnectReturn<TConfig>;
   }
 
-  log("No existing instance, creating a new one");
+  logger.log("No existing instance, creating a new one");
   const porter = connectPorter({
     namespace: "crann",
+    debug: false,
   });
 
-  console.log("[DEBUG] Porter connection created");
+  logger.log("Porter connection created");
 
   // Initialize RPC with empty actions since this is the client side
   const actions = Object.entries(config)
@@ -99,13 +90,13 @@ export function connect<TConfig extends AnyConfig>(
 
   porter.on({
     initialState: (message) => {
-      console.log("[DEBUG] initialState received", {
+      logger.log("initialState received", {
         alreadyReceived: initialStateReceived,
         payload: message.payload,
       });
 
       if (initialStateReceived) {
-        console.log("[DEBUG] Ignoring duplicate initialState message");
+        logger.log("Ignoring duplicate initialState message");
         return;
       }
 
@@ -124,13 +115,8 @@ export function connect<TConfig extends AnyConfig>(
           message,
         }
       );
-
-      log(`Initial state received and  ${listeners.size} listeners notified`, {
-        message,
-      });
-
       readyCallbacks.forEach((callback) => {
-        console.log("Calling onReady callbacks");
+        logger.log("Calling onReady callbacks");
         callback(connectionStatus);
       });
       listeners.forEach((listener) => {
@@ -140,7 +126,7 @@ export function connect<TConfig extends AnyConfig>(
     stateUpdate: (message) => {
       changes = message.payload.state;
       _state = { ..._state, ...changes };
-      log("State updated: ", { message, changes, _state });
+      logger.log("State updated:", { message, changes, _state });
       if (!changes) return;
 
       listeners.forEach((listener) => {
@@ -155,16 +141,16 @@ export function connect<TConfig extends AnyConfig>(
       });
     },
   });
-  log("Porter connected. Setting up state and listeners");
+  logger.log("Porter connected. Setting up state and listeners");
   let _state = getDerivedState(config);
   let changes: Partial<DerivedState<TConfig>> | null = null;
   const listeners = new Set<StateSubscriber<TConfig>>();
 
-  log("Completed setup, returning instance");
+  logger.log("Completed setup, returning instance");
 
   const get = () => _state;
   const set = (newState: Partial<DerivedState<TConfig>>) => {
-    console.log("CrannAgent, calling post with setState");
+    logger.log("Calling post with setState", newState);
     porter.post({ action: "setState", payload: { state: newState } });
   };
 
@@ -219,10 +205,10 @@ export function connect<TConfig extends AnyConfig>(
   };
 
   const onReady = (callback: (info: ConnectionStatus) => void) => {
-    console.log("[Crann:Agent], onReady callback added");
+    logger.log("onReady callback added");
     readyCallbacks.add(callback);
     if (connectionStatus.connected) {
-      console.log("[Crann:Agent], calling onReady callback");
+      logger.log("calling onReady callback");
       setTimeout(() => {
         callback(connectionStatus);
       }, 0);
@@ -233,7 +219,7 @@ export function connect<TConfig extends AnyConfig>(
   const getAgentInfo = () => _myInfo;
 
   const callAction = async (name: string, ...args: any[]) => {
-    console.log("MOC Calling action", name, args);
+    logger.log("Calling action", name, args);
     return (rpcEndpoint as any)[name](...args);
   };
 
@@ -267,8 +253,4 @@ function getDerivedState<TConfig extends AnyConfig>(
     }
   });
   return state;
-}
-
-function getAgentTag(agent: AgentInfo): string {
-  return `${agent.location.context}:${agent.location.tabId}:${agent.location.frameId}`;
 }

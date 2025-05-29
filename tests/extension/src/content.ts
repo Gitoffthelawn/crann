@@ -89,11 +89,10 @@ function createTestUI() {
 }
 
 // Initialize Crann and UI
-const { useCrann, get, set, subscribe, getAgentInfo, onReady, callAction } =
-  connect(config, { debug: true });
+const { get, subscribe, onReady, callAction } = connect(config, {
+  debug: true,
+});
 
-// const { post, on, getAgentInfo }: ConnectReturn<typeof config> =
-//   connect(config, { debug: true });
 const ui = createTestUI();
 
 // Wait for connection
