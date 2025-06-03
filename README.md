@@ -303,6 +303,7 @@ Actions are defined in your config alongside regular state items. The key differ
 ```typescript
 // service-worker.ts
 import { create } from "crann";
+import { BrowserLocation } from "porter-source";
 
 const crann = create({
   // Regular state
@@ -313,9 +314,16 @@ const crann = create({
 
   // RPC action
   increment: {
-    handler: async (state, amount: number) => {
+    handler: async (
+      state: any,
+      setState: (newState: Partial<any>) => Promise<void>,
+      target: BrowserLocation,
+      amount: number
+    ) => {
       // This runs in the service worker
-      return { counter: state.counter + amount };
+      const newCounter = state.counter + amount;
+      await setState({ counter: newCounter });
+      return { counter: newCounter };
     },
     validate: (amount: number) => {
       if (amount < 0) throw new Error("Amount must be positive");
@@ -324,7 +332,12 @@ const crann = create({
 
   // Another action example
   fetchData: {
-    handler: async (state, url: string) => {
+    handler: async (
+      state: any,
+      setState: (newState: Partial<any>) => Promise<void>,
+      target: BrowserLocation,
+      url: string
+    ) => {
       // This runs in the service worker where we can make network requests
       const response = await fetch(url);
       const data = await response.json();
@@ -339,11 +352,49 @@ const crann = create({
 
   // Action that returns the current time
   getCurrentTime: {
-    handler: async (state) => {
+    handler: async (
+      state: any,
+      setState: (newState: Partial<any>) => Promise<void>,
+      target: BrowserLocation
+    ) => {
       return { time: new Date().toISOString() };
     },
   },
 });
+```
+
+#### Understanding Action Handler Parameters
+
+Action handlers receive four parameters that are automatically provided by Crann:
+
+1. **`state`**: The current state object containing all shared and service state
+2. **`setState`**: A function to update the state from within the action. Use this to persist changes made by your action
+3. **`target`**: A `BrowserLocation` object that identifies which context called the action
+4. **`...args`**: The arguments passed to the action when called via `callAction()`
+
+```typescript
+// Example showing how to use each parameter
+incrementWithLogging: {
+  handler: async (
+    state: any,
+    setState: (newState: Partial<any>) => Promise<void>,
+    target: BrowserLocation,
+    amount: number
+  ) => {
+    // Read from state
+    const currentCount = state.counter;
+
+    // Log which context called this action
+    console.log(`Increment called from ${target.context} with amount ${amount}`);
+
+    // Update state
+    const newCount = currentCount + amount;
+    await setState({ counter: newCount });
+
+    // Return result (optional)
+    return { counter: newCount, previousValue: currentCount };
+  },
+}
 ```
 
 #### Using Actions in Service Worker
