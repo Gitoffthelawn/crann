@@ -1,4 +1,4 @@
-import { create, Partition, Persistence } from "crann";
+import { create } from "crann";
 import { config } from "./config";
 import { PorterContext } from "porter-source";
 

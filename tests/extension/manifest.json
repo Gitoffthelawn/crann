@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Crann Test Extension",
-  "version": "0.0.195",
+  "version": "0.0.219",
   "description": "Crann test extension",
   "permissions": [
     "tabs",

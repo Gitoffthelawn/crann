@@ -1,9 +1,9 @@
 import { Partition, Persistence } from "crann";
 import { BrowserLocation } from "porter-source";
-import { CrannConfig } from "../../../dist/types/model/crann.model";
+import { AnyConfig, CrannConfig } from "../../../dist/types/model/crann.model";
 
 // Define our test configuration
-export const config: CrannConfig<any> = {
+export const config = {
   // Basic state with default value
   active: { default: false },
 
@@ -11,6 +11,7 @@ export const config: CrannConfig<any> = {
   name: {
     default: "",
     partition: Partition.Instance,
+    something: "hello",
   },
 
   // State that persists between sessions
@@ -33,9 +34,14 @@ export const config: CrannConfig<any> = {
       target: BrowserLocation,
       amount: number
     ) => {
+      console.log("Increment heard, handler has properties: ", {
+        state,
+        target,
+        amount,
+      });
       const newValue = state.timesUsed + amount;
       await setState({ timesUsed: newValue });
-      console.log("Increment heard from target: ", target);
+
       return newValue;
     },
     validate: (amount: number) => {

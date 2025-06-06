@@ -3,6 +3,7 @@ import {
   AnyConfig,
   ConfigItem,
   DerivedState,
+  StateChanges,
   StateUpdate,
 } from "../model/crann.model";
 import { connect } from "../crannAgent";
@@ -42,7 +43,7 @@ export function createCrannStateHook<TConfig extends AnyConfig>(
 
         const updateValue = useCallback(
           (newValue: DerivedState<TConfig>[K]) => {
-            set({ [key]: newValue } as Partial<DerivedState<TConfig>>);
+            set({ [key]: newValue } as StateChanges<TConfig>);
           },
           [key]
         );
@@ -55,7 +56,7 @@ export function createCrannStateHook<TConfig extends AnyConfig>(
     const getState = useCallback(() => get(), [get]);
 
     const setState = useCallback(
-      (newState: Partial<DerivedState<TConfig>>) => {
+      (newState: StateChanges<TConfig>) => {
         set(newState);
       },
       [set]
