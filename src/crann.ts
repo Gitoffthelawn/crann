@@ -10,6 +10,10 @@ import {
   AnyConfig,
   isStateItem,
   isActionItem,
+  SetStateCallback,
+  SetStateFunction,
+  StateChangeListener,
+  StateChanges,
 } from "./model/crann.model";
 import { AgentInfo, source, Agent } from "porter-source";
 import { deepEqual } from "./utils/deepEqual";
@@ -26,15 +30,7 @@ export class Crann<TConfig extends AnyConfig> {
   private defaultServiceState: DerivedServiceState<TConfig>;
   private defaultInstanceState: DerivedInstanceState<TConfig>;
   private serviceState: DerivedServiceState<TConfig>;
-  private stateChangeListeners: Array<
-    (
-      state: DerivedInstanceState<TConfig> | DerivedState<TConfig>,
-      changes: Partial<
-        DerivedServiceState<TConfig> & DerivedInstanceState<TConfig>
-      >,
-      agent?: AgentInfo
-    ) => void
-  > = [];
+  private stateChangeListeners: Array<StateChangeListener<TConfig>> = [];
   private instanceReadyListeners: Array<
     (instanceId: string, agent: AgentInfo) => void
   > = [];
@@ -141,13 +137,39 @@ export class Crann<TConfig extends AnyConfig> {
       });
     });
 
+    const setStateCallback: SetStateCallback<TConfig> = ((
+      state: any,
+      key?: string
+    ) => {
+      if (key !== undefined) {
+        return this.set(state, key);
+      } else {
+        return this.set(state);
+      }
+    }) as SetStateCallback<TConfig>;
+
+    // Cast to the generic version when passing to RPC adapter
+    const genericSetState = setStateCallback as SetStateFunction<
+      DerivedState<TConfig>
+    >;
+
     // Initialize RPC with actions
     const actions = this.extractActions(config);
+
+    const stateGetter = () => {
+      const currentState = this.get();
+      this.logger.log(
+        "State getter called, returning current state:",
+        currentState
+      );
+      return currentState;
+    };
+
     this.rpcEndpoint = createCrannRPCAdapter(
-      this.get(),
+      stateGetter,
       actions,
       this.porter,
-      (newState: Partial<DerivedState<TConfig>>) => this.set(newState)
+      genericSetState
     );
   }
 
@@ -198,7 +220,8 @@ export class Crann<TConfig extends AnyConfig> {
   public async setServiceState(
     state: Partial<DerivedServiceState<TConfig>>
   ): Promise<void> {
-    this.logger.log("Request to set service state with:", state);
+    this.logger.log("Request to set service state with update:", state);
+    this.logger.log("Existing service state was ", this.serviceState);
     const update = { ...this.serviceState, ...state };
     if (!deepEqual(this.serviceState, update)) {
       this.logger.log(
@@ -206,7 +229,7 @@ export class Crann<TConfig extends AnyConfig> {
       );
       this.serviceState = update;
       await this.persist(state);
-      this.notify(state as Partial<DerivedState<TConfig>>);
+      this.notify(state as StateChanges<TConfig>);
     } else {
       this.logger.log("New state seems to be the same as existing, skipping");
     }
@@ -227,7 +250,7 @@ export class Crann<TConfig extends AnyConfig> {
         .withTag(key)
         .log("Instance state update is different, updating and notifying.");
       this.instances.set(key, update);
-      this.notify(state as Partial<DerivedState<TConfig>>, key);
+      this.notify(state as StateChanges<TConfig>, key);
     } else {
       this.logger
         .withTag(key)
@@ -279,25 +302,17 @@ export class Crann<TConfig extends AnyConfig> {
       this.instances.set(key, this.defaultInstanceState);
     });
     await this.persist();
-    this.notify({});
+    this.notify({} as StateChanges<TConfig>);
   }
 
-  public subscribe(
-    listener: (
-      state: DerivedInstanceState<TConfig> | DerivedState<TConfig>,
-      changes: Partial<
-        DerivedInstanceState<TConfig> & DerivedServiceState<TConfig>
-      >,
-      agent?: AgentInfo
-    ) => void
-  ): void {
+  public subscribe(listener: StateChangeListener<TConfig>): void {
     this.logger.log("Subscribing to state");
     this.stateChangeListeners.push(listener);
   }
 
   // Right now we notify the instance even if the state change came from the instance.
   // This should probably be skipped for instance state, since it already knows.
-  private notify(changes: Partial<DerivedState<TConfig>>, key?: string): void {
+  private notify(changes: StateChanges<TConfig>, key?: string): void {
     const agent = key ? this.porter.getAgentById(key) : undefined;
     const state = key ? this.get(key) : this.get();
 
@@ -369,7 +384,9 @@ export class Crann<TConfig extends AnyConfig> {
     key: string
   ): Promise<void>;
   public async set(
-    state: Partial<DerivedState<TConfig>>,
+    state:
+      | Partial<DerivedServiceState<TConfig>>
+      | Partial<DerivedInstanceState<TConfig>>,
     key?: string
   ): Promise<void> {
     const instance = {} as Partial<DerivedInstanceState<TConfig>>;
@@ -406,12 +423,19 @@ export class Crann<TConfig extends AnyConfig> {
     const local = await browser.storage.local.get(null);
     const session = await browser.storage.session.get(null);
     const combined = { ...local, ...session };
+
+    this.logger.log("Storage data is:", { local, session, combined });
+
     const update: Partial<DerivedServiceState<TConfig>> = {}; // Cast update as Partial<DerivedState<TConfig>>
     let hadItems = false;
     for (const prefixedKey in combined) {
       const key = this.removePrefix(prefixedKey);
+      this.logger.log(`Checking storage key ${prefixedKey} -> ${key}`);
+
       if (this.config.hasOwnProperty(key)) {
-        const value = combined[key];
+        const value = combined[prefixedKey];
+
+        this.logger.log(`Found storage value for ${key}:`, value);
         update[key as keyof DerivedServiceState<TConfig>] = value;
         hadItems = true;
       }
@@ -443,16 +467,27 @@ export class Crann<TConfig extends AnyConfig> {
   }
 
   private initializeServiceDefault(): DerivedServiceState<TConfig> {
+    this.logger.log("Initializing service default state");
+    this.logger.log("Config is:", this.config);
+
     const serviceState: any = {};
     Object.keys(this.config).forEach((key) => {
       const item = this.config[key];
+      this.logger.log("Item is:", item);
       if (
         isStateItem(item) &&
         (!item.partition || item.partition === Partition.Service)
       ) {
         serviceState[key] = item.default;
+        this.logger.log(
+          "Setting service state for key:",
+          key,
+          "to",
+          item.default
+        );
       }
     });
+    this.logger.log("Final service state is:", serviceState);
     return serviceState;
   }
 
@@ -524,15 +559,7 @@ export interface CrannAPI<TConfig extends AnyConfig> {
       key: string
     ): Promise<void>;
   };
-  subscribe: (
-    listener: (
-      state: DerivedInstanceState<TConfig> | DerivedState<TConfig>,
-      changes: Partial<
-        DerivedInstanceState<TConfig> & DerivedServiceState<TConfig>
-      >,
-      agent?: AgentInfo
-    ) => void
-  ) => void;
+  subscribe: (listener: StateChangeListener<TConfig>) => void;
   onInstanceReady: (
     listener: (instanceId: string, agent: AgentInfo) => void
   ) => () => void;

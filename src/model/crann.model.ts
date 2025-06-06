@@ -13,7 +13,7 @@ export const Persistence = {
 
 export type ActionHandler<TState, TArgs extends any[], TResult> = (
   state: TState,
-  setState: (newState: Partial<TState>) => Promise<void>,
+  setState: SetStateFunction<TState>,
   target: BrowserLocation,
   ...args: TArgs
 ) => Promise<TResult>;
@@ -25,6 +25,21 @@ export type ActionDefinition<TState, TArgs extends any[], TResult> = {
 
 export type ActionsConfig<TState> = {
   [K: string]: ActionDefinition<TState, any[], Partial<TState>>;
+};
+
+// The following "SetState" types are used to define the types for the setState function in the RPC adapter.
+// To prevent a cirucular dependency with TConfig, we define a specific and a generic version.
+
+// This is the type that the RPC adapter expects
+export type SetStateFunction<TState> = {
+  (state: Partial<TState>): Promise<void>;
+  (state: Partial<TState>, key: string): Promise<void>;
+};
+
+// This is the more specific type that the Crann instance expects
+export type SetStateCallback<TConfig extends AnyConfig> = {
+  (state: Partial<DerivedServiceState<TConfig>>): Promise<void>;
+  (state: Partial<DerivedInstanceState<TConfig>>, key: string): Promise<void>;
 };
 
 // Input types (what users provide in their config)
@@ -51,20 +66,26 @@ export type ActionConfig<T extends AnyConfig> = {
 
 // Update DerivedState to use the internal types
 export type DerivedState<T extends AnyConfig> = {
-  [P in keyof T]: T[P] extends ConfigItem<any> ? T[P]["default"] : never;
+  [P in keyof T]: T[P] extends ConfigItem<infer DefaultType>
+    ? DefaultType
+    : never;
 };
 
 // Update DerivedInstanceState to use the internal types
 export type DerivedInstanceState<T extends AnyConfig> = {
-  [P in keyof T]: T[P] extends ConfigItem<any> & { partition: "instance" }
-    ? T[P]["default"]
+  [P in keyof T]: T[P] extends ConfigItem<infer DefaultType> & {
+    partition: "instance";
+  }
+    ? DefaultType
     : never;
 };
 
 // Update DerivedServiceState to use the internal types
 export type DerivedServiceState<T extends AnyConfig> = {
-  [P in keyof T]: T[P] extends ConfigItem<any> & { partition: "service" }
-    ? T[P]["default"]
+  [P in keyof T]: T[P] extends ConfigItem<infer DefaultType>
+    ? T[P] extends { partition: "instance" }
+      ? never
+      : DefaultType
     : never;
 };
 
@@ -117,6 +138,10 @@ type ConnectReturn<TConfig extends AnyConfig> = {
   callAction: (name: string, ...args: any[]) => Promise<any>;
 };
 
+export type StateChanges<T extends AnyConfig> = {
+  [K in keyof DerivedState<T>]?: NonNullable<DerivedState<T>[K]>;
+};
+
 type StateChangeUpdate<
   TConfig extends AnyConfig,
   K extends keyof DerivedState<TConfig>
@@ -126,6 +151,12 @@ type StateChangeUpdate<
   state: DerivedState<TConfig>;
 };
 
+export type StateChangeListener<TConfig extends AnyConfig> = (
+  state: DerivedInstanceState<TConfig> | DerivedState<TConfig>,
+  changes: StateChanges<TConfig>,
+  agent?: AgentInfo
+) => void;
+
 type AgentSubscription<TConfig extends AnyConfig> = {
   (
     callback: (changes: StateUpdate<TConfig>) => void,
@@ -133,7 +164,7 @@ type AgentSubscription<TConfig extends AnyConfig> = {
   ): number;
 };
 
-type StateUpdate<TConfig extends AnyConfig> = Partial<DerivedState<TConfig>>;
+type StateUpdate<TConfig extends AnyConfig> = StateChanges<TConfig>;
 
 export type CrannOptions = {
   debug?: boolean;

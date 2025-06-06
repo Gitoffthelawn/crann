@@ -104,6 +104,7 @@ onReady((status) => {
     subscribe((changes) => {
       if ("timesUsed" in changes) {
         console.log("timesUsed changed", changes.timesUsed);
+        const timesUsed = changes.timesUsed;
         ui.updateCounter(changes.timesUsed as number);
       }
     });

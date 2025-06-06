@@ -1,6 +1,7 @@
 export { create, Crann } from "./crann";
 export { connect, connected } from "./crannAgent";
 export { createCrannStateHook } from "./hooks/useCrannState";
+export { createConfig } from "./utils/config";
 export {
   CrannAgent,
   StateUpdate,

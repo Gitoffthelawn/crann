@@ -1,5 +1,6 @@
 import { Partition, Persistence } from "crann";
 import { BrowserLocation } from "porter-source";
+import { AnyConfig, CrannConfig } from "../../../dist/types/model/crann.model";
 
 // Define our test configuration
 export const config = {
@@ -10,18 +11,19 @@ export const config = {
   name: {
     default: "",
     partition: Partition.Instance,
+    something: "hello",
   },
 
   // State that persists between sessions
   timesUsed: {
     default: 0,
-    persistence: Persistence.Local,
+    persist: Persistence.Local,
   },
 
   // State that resets when the browser closes
   sessionStart: {
     default: new Date(),
-    persistence: Persistence.Session,
+    persist: Persistence.Session,
   },
 
   // RPC action example
@@ -32,9 +34,14 @@ export const config = {
       target: BrowserLocation,
       amount: number
     ) => {
+      console.log("Increment heard, handler has properties: ", {
+        state,
+        target,
+        amount,
+      });
       const newValue = state.timesUsed + amount;
       await setState({ timesUsed: newValue });
-      console.log("Increment heard from target: ", target);
+
       return newValue;
     },
     validate: (amount: number) => {

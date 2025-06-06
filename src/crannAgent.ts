@@ -10,6 +10,7 @@ import {
   AnyConfig,
   isStateItem,
   isActionItem,
+  StateChanges,
 } from "./model/crann.model";
 import { AgentInfo, connect as connectPorter } from "porter-source";
 import { createCrannRPCAdapter } from "./rpc/adapter";
@@ -81,7 +82,7 @@ export function connect<TConfig extends AnyConfig>(
     }, {});
 
   const rpcEndpoint = createCrannRPCAdapter(
-    getDerivedState(config),
+    () => getDerivedState(config),
     actions,
     porter
   );
@@ -120,7 +121,7 @@ export function connect<TConfig extends AnyConfig>(
         callback(connectionStatus);
       });
       listeners.forEach((listener) => {
-        listener.callback(_state);
+        listener.callback(_state as StateChanges<TConfig>);
       });
     },
     stateUpdate: (message) => {
@@ -143,19 +144,19 @@ export function connect<TConfig extends AnyConfig>(
   });
   logger.log("Porter connected. Setting up state and listeners");
   let _state = getDerivedState(config);
-  let changes: Partial<DerivedState<TConfig>> | null = null;
+  let changes: StateChanges<TConfig> | null = null;
   const listeners = new Set<StateSubscriber<TConfig>>();
 
   logger.log("Completed setup, returning instance");
 
   const get = () => _state;
-  const set = (newState: Partial<DerivedState<TConfig>>) => {
+  const set = (newState: StateChanges<TConfig>) => {
     logger.log("Calling post with setState", newState);
     porter.post({ action: "setState", payload: { state: newState } });
   };
 
   const subscribe = (
-    callback: (changes: Partial<DerivedState<TConfig>>) => void,
+    callback: (changes: StateChanges<TConfig>) => void,
     keys?: Array<keyof DerivedState<TConfig>>
   ): (() => void) => {
     const listener = { keys, callback };
@@ -177,7 +178,7 @@ export function connect<TConfig extends AnyConfig>(
 
     const setValue = (
       value: TConfig[K] extends ConfigItem<any> ? TConfig[K]["default"] : never
-    ) => set({ [key]: value } as Partial<DerivedState<TConfig>>);
+    ) => set({ [key]: value } as StateChanges<TConfig>);
 
     const subscribeToChanges = (
       callback: (update: StateChangeUpdate<TConfig, K>) => void

@@ -10,7 +10,7 @@ import type {
   ErrorMessage,
   RPCMessage,
 } from "./types";
-import { ActionsConfig } from "../model/crann.model";
+import { ActionsConfig, SetStateFunction } from "../model/crann.model";
 import { Logger } from "../utils/logger";
 import { getAgentTag } from "../utils/agent";
 
@@ -62,9 +62,9 @@ export interface Endpoint<T> {
  */
 export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
   messenger: MessageEndpoint,
-  state: TState,
+  stateGetter: () => TState,
   actions: TActions,
-  setState?: (newState: Partial<TState>) => Promise<void>,
+  setState?: SetStateFunction<TState>,
   encodingStrategy?: EncodingStrategy
 ): RemoteCallable<TActions> {
   const callbacks = new Map<number, (result: unknown) => void>();
@@ -118,8 +118,13 @@ export function createEndpoint<TState, TActions extends ActionsConfig<TState>>(
           return;
         }
 
+        const currentState = stateGetter();
+        logger.debug("Executing action with most current state:", currentState);
+
         // Handle both synchronous and asynchronous results
-        Promise.resolve(action.handler(state, setState!, target, ...args)).then(
+        Promise.resolve(
+          action.handler(currentState, setState!, target, ...args)
+        ).then(
           (result: unknown) => {
             logger.debug("Action handler result:", {
               result,
