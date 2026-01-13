@@ -1,0 +1,53 @@
+{
+  "project_name": "Crann",
+  "description": "A lightweight state synchronization library for Web Extensions",
+  "primary_purpose": "To simplify state management and synchronization across different parts of a Web Extension (Content Scripts, Service Worker, Devtools, Sidepanels, Popup, etc.)",
+  "key_features": [
+    "Minimal size (< 5kb)",
+    "Automatic state synchronization between extension contexts",
+    "Eliminates manual message passing boilerplate",
+    "Reactive state updates via subscriptions",
+    "Optional state persistence (Local/Session storage)",
+    "Full TypeScript support with strong type inference"
+  ],
+  "core_components": {
+    "state_hub": {
+      "location": "Service Worker",
+      "purpose": "Central state management and synchronization",
+      "key_functions": [
+        "create",
+        "get",
+        "subscribe"
+      ]
+    },
+    "client_connections": {
+      "supported_contexts": [
+        "Content Scripts",
+        "Service Worker",
+        "Devtools",
+        "Sidepanels",
+        "Popup"
+      ],
+      "key_functions": [
+        "connect",
+        "get",
+        "set",
+        "subscribe"
+      ]
+    }
+  },
+  "state_management_features": {
+    "partitioned_state": "Support for context-specific state (Partition.Instance)",
+    "persistence_options": [
+      "Local Storage (Persistence.Local)",
+      "Session Storage (Persistence.Session)"
+    ],
+    "complex_types": "Support for custom types and type assertions"
+  },
+  "technical_details": {
+    "package_manager": "npm",
+    "installation_command": "npm i crann",
+    "primary_language": "TypeScript",
+    "target_platform": "Web Extensions"
+  }
+}
