@@ -42,7 +42,7 @@
 - [ ] Define new `ConfigItem` type with `scope` instead of `partition`
 - [ ] Define new `ActionDefinition` with `handler` receiving context object
 - [ ] Create `createConfig<T>()` helper (or decide on `satisfies` pattern)
-- [ ] Update type inference (`DerivedState`, `DerivedGlobalState`, `DerivedTabState`)
+- [ ] Update type inference (`DerivedState`, `DerivedSharedState`, `DerivedAgentState`)
 - [ ] Add `OmitNever` consistently to derived types
 - [ ] Write tests for type inference
 
@@ -57,11 +57,11 @@
 
 - [ ] Extract from current Crann into `src/store/StateManager.ts`
 - [ ] `getState()` - returns full state
-- [ ] `getGlobalState()` - returns global-scoped state
-- [ ] `getTabState(agentId)` - returns tab-scoped state for agent
+- [ ] `getSharedState()` - returns shared-scoped state
+- [ ] `getAgentState(agentId)` - returns agent-scoped state for agent
 - [ ] `setState()` - properly async, returns Promise
-- [ ] `setGlobalState()` - async
-- [ ] `setTabState(agentId, state)` - async
+- [ ] `setSharedState()` - async
+- [ ] `setAgentState(agentId, state)` - async
 - [ ] Fix: await all internal state operations
 - [ ] Use proper deep equality (handle Date, Map, Set)
 - [ ] Emit change events
@@ -162,10 +162,10 @@
 ### 3.1 Naming Consistency
 
 - [ ] Rename throughout codebase:
-  - [ ] `partition: 'service'` → `scope: 'global'`
-  - [ ] `partition: 'instance'` → `scope: 'tab'`
-  - [ ] `serviceState` → `globalState`
-  - [ ] `instanceState` → `tabState`
+  - [ ] `partition: 'service'` → `scope: 'shared'`
+  - [ ] `partition: 'instance'` → `scope: 'agent'`
+  - [ ] `serviceState` → `sharedState`
+  - [ ] `instanceState` → `agentState`
   - [ ] `onInstanceReady` → `onAgentConnect`
 - [ ] Update all types
 - [ ] Update all internal variables
@@ -329,6 +329,25 @@ These are nice-to-haves that didn't make the cut:
 
 Use this section to record decisions made during implementation.
 
+### 2026-01-13 - Scope Terminology: `shared`/`agent`
+
+**Context:** Needed to finalize terminology for state scoping. Original proposal was `global`/`tab`.  
+**Options:**
+
+1. `global`/`tab` - intuitive but "tab" is technically imprecise (iframes each get their own instance)
+2. `global`/`frame` - accurate but forces users to think about frames
+3. `global`/`local` - but state isn't truly local (still managed by service worker)
+4. `shared`/`agent` - aligns with Crann's existing agent terminology
+
+**Decision:** `scope: 'shared'` and `scope: 'agent'`  
+**Rationale:**
+
+- "agent" sidesteps the tab vs frame debate entirely by aligning with Crann's existing terminology
+- "shared" avoids collision with JavaScript's `global` object in Node/service workers
+- The pairing is intuitive: "Is this state shared across all agents, or specific to this agent?"
+
+---
+
 ### [Date] - Decision Title
 
 **Context:** What was the situation?  
@@ -338,4 +357,4 @@ Use this section to record decisions made during implementation.
 
 ---
 
-_Last updated: 2026-01-12_
+_Last updated: 2026-01-13_
