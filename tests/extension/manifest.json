@@ -1,7 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Crann Test Extension",
+<<<<<<< Updated upstream
   "version": "0.0.222",
+=======
+  "version": "0.0.220",
+>>>>>>> Stashed changes
   "description": "Crann test extension",
   "permissions": [
     "tabs",
