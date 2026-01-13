@@ -317,7 +317,7 @@ See [initiatives/v2-redesign/DESIGN.md](./initiatives/v2-redesign/DESIGN.md) for
 - Merge Porter-Source into Crann
 - Typed action invocation
 - React hook simplification
-- Consistent naming (global/tab instead of service/instance)
+- Consistent naming (shared/agent instead of service/instance)
 
 ### Post-v2
 

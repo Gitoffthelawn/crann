@@ -3,7 +3,7 @@
 > **Status:** Draft  
 > **Authors:** Marc O'Cleirigh  
 > **Created:** 2026-01-12  
-> **Last Updated:** 2026-01-12
+> **Last Updated:** 2026-01-13
 
 ---
 
@@ -148,15 +148,15 @@ With few current users and a goal of external adoption, now is the time for brea
 
 ### Terminology
 
-| Old                   | New             | Rationale        |
-| --------------------- | --------------- | ---------------- |
-| Crann (class)         | Store           | Universal term   |
-| create()              | createStore()   | More descriptive |
-| connect()             | connectStore()  | Parallel naming  |
-| Instance state        | Tab state       | Clearer meaning  |
-| Service state         | Global state    | Clearer meaning  |
-| partition: 'instance' | scope: 'tab'    | More intuitive   |
-| partition: 'service'  | scope: 'global' | More intuitive   |
+| Old                   | New             | Rationale                                   |
+| --------------------- | --------------- | ------------------------------------------- |
+| Crann (class)         | Store           | Universal term                              |
+| create()              | createStore()   | More descriptive                            |
+| connect()             | connectStore()  | Parallel naming                             |
+| Instance state        | Agent state     | Aligns with Crann's "agent" terminology     |
+| Service state         | Shared state    | State shared across all agents              |
+| partition: 'instance' | scope: 'agent'  | Scoped to specific agent (avoids tab/frame) |
+| partition: 'service'  | scope: 'shared' | Shared across all agents                    |
 
 ### Config Schema
 
@@ -167,13 +167,13 @@ const config = createConfig({
   // State items
   count: {
     default: 0,
-    scope: "global", // 'global' | 'tab' (default: 'global')
+    scope: "shared", // 'shared' | 'agent' (default: 'shared')
     persist: "local", // 'local' | 'session' | 'none' (default: 'none')
   },
 
-  tabData: {
-    default: null as TabData | null,
-    scope: "tab",
+  agentData: {
+    default: null as AgentData | null,
+    scope: "agent",
   },
 
   // Actions (RPC)
@@ -241,11 +241,11 @@ store.onAgentDisconnect((agent) => {
   console.log('Agent disconnected:', agent.id);
 });
 
-// Get agent's tab-scoped state
-const tabState = store.getTabState(agentId);
+// Get agent's agent-scoped state
+const agentState = store.getAgentState(agentId);
 
-// Set agent's tab-scoped state
-await store.setTabState(agentId, { tabData: { ... } });
+// Set agent's agent-scoped state
+await store.setAgentState(agentId, { agentData: { ... } });
 
 // Query connected agents
 const agents = store.getAgents({ context: 'content_script' });
@@ -421,7 +421,7 @@ src/
   agent/
     Agent.ts           # Main class
     Connection.ts      # porter-source wrapper
-  shared/
+  common/
     types.ts           # Config, state types
     config.ts          # createConfig helper
 ```
@@ -469,8 +469,8 @@ public async set(state) {
 // After
 public async setState(state) {
   const promises = [];
-  if (hasTabState) promises.push(this.setTabState(agentId, tabState));
-  if (hasGlobalState) promises.push(this.setGlobalState(globalState));
+  if (hasAgentState) promises.push(this.setAgentState(agentId, agentState));
+  if (hasSharedState) promises.push(this.setSharedState(sharedState));
   await Promise.all(promises);
 }
 ```
@@ -534,7 +534,7 @@ class Logger {
 
 ### Phase 3: API Polish (2-3 days)
 
-- [ ] Unify naming (global/tab, source/agent)
+- [ ] Unify naming (shared/agent)
 - [ ] Make source and agent APIs symmetric
 - [ ] Improve error messages
 - [ ] Add input validation
@@ -582,8 +582,8 @@ const config = {
 
 // v2
 const config = createConfig({
-  count: { default: 0, scope: "global", persist: "local" },
-  tabData: { default: null, scope: "tab" },
+  count: { default: 0, scope: "shared", persist: "local" },
+  agentData: { default: null, scope: "agent" },
 });
 ```
 
