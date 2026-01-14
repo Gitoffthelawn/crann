@@ -97,7 +97,7 @@ describe('ActionExecutor', () => {
 
       await expect(
         executor.execute('nonExistent', [], createAgentInfo())
-      ).rejects.toThrow('Unknown action "nonExistent"');
+      ).rejects.toThrow('Unknown action');
     });
 
     it('should throw if no actions defined', async () => {

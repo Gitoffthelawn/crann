@@ -24,6 +24,7 @@ import { StateManager } from "./StateManager";
 import { Persistence } from "./Persistence";
 import { AgentRegistry } from "./AgentRegistry";
 import { ActionExecutor } from "./ActionExecutor";
+import { LifecycleError } from "../errors";
 
 // =============================================================================
 // Store Class
@@ -74,7 +75,14 @@ export class Store<TConfig extends ConfigSchema> {
   // ===========================================================================
 
   /**
-   * Get the current shared state.
+   * Get the current shared state (state visible to all agents).
+   *
+   * @returns A snapshot of the current shared state
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * const state = store.getState();
+   * console.log(state.count);
    */
   getState(): DerivedState<TConfig> {
     this.assertNotDestroyed();
@@ -83,6 +91,15 @@ export class Store<TConfig extends ConfigSchema> {
 
   /**
    * Get agent-scoped state for a specific agent.
+   *
+   * @param agentId - The unique identifier of the agent
+   * @returns The agent-scoped state for the specified agent
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * store.onAgentConnect((agent) => {
+   *   const agentState = store.getAgentState(agent.id);
+   * });
    */
   getAgentState(agentId: string): DerivedAgentState<TConfig> {
     this.assertNotDestroyed();
@@ -90,11 +107,24 @@ export class Store<TConfig extends ConfigSchema> {
   }
 
   /**
-   * Update shared state.
+   * Update shared state. Changes are persisted and broadcast to all agents.
+   *
+   * @param state - Partial state to merge with current shared state
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * await store.setState({ count: 5 });
    */
   async setState(state: Partial<DerivedSharedState<TConfig>>): Promise<void>;
   /**
-   * Update state for a specific agent (can include both shared and agent-scoped).
+   * Update state for a specific agent. Can include both shared and agent-scoped state.
+   *
+   * @param state - Partial state to merge
+   * @param agentId - The agent to update (for agent-scoped state)
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * await store.setState({ count: 5, agentData: 'custom' }, agentId);
    */
   async setState(
     state: Partial<DerivedState<TConfig>>,
@@ -119,6 +149,13 @@ export class Store<TConfig extends ConfigSchema> {
 
   /**
    * Update agent-scoped state for a specific agent.
+   *
+   * @param agentId - The unique identifier of the agent
+   * @param state - Partial agent-scoped state to merge
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * await store.setAgentState(agentId, { agentData: 'custom' });
    */
   async setAgentState(
     agentId: string,
@@ -130,7 +167,12 @@ export class Store<TConfig extends ConfigSchema> {
   }
 
   /**
-   * Clear all state back to defaults.
+   * Clear all state back to defaults and remove persisted data.
+   *
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * await store.clear();
    */
   async clear(): Promise<void> {
     this.assertNotDestroyed();
@@ -144,7 +186,17 @@ export class Store<TConfig extends ConfigSchema> {
   // ===========================================================================
 
   /**
-   * Subscribe to state changes.
+   * Subscribe to state changes. Called whenever state is updated.
+   *
+   * @param listener - Callback receiving (state, changes, agent?)
+   * @returns Unsubscribe function
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * const unsubscribe = store.subscribe((state, changes, agent) => {
+   *   console.log('State changed:', changes);
+   * });
+   * // Later: unsubscribe();
    */
   subscribe(listener: StateChangeListener<TConfig>): () => void {
     this.assertNotDestroyed();
@@ -155,7 +207,16 @@ export class Store<TConfig extends ConfigSchema> {
   }
 
   /**
-   * Register callback for agent connections.
+   * Register callback for when an agent connects.
+   *
+   * @param callback - Called with agent connection info
+   * @returns Unsubscribe function
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * store.onAgentConnect((agent) => {
+   *   console.log(`Agent ${agent.id} connected from tab ${agent.tabId}`);
+   * });
    */
   onAgentConnect(callback: (agent: AgentConnectionInfo) => void): () => void {
     this.assertNotDestroyed();
@@ -166,7 +227,16 @@ export class Store<TConfig extends ConfigSchema> {
   }
 
   /**
-   * Register callback for agent disconnections.
+   * Register callback for when an agent disconnects.
+   *
+   * @param callback - Called with agent connection info
+   * @returns Unsubscribe function
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * store.onAgentDisconnect((agent) => {
+   *   console.log(`Agent ${agent.id} disconnected`);
+   * });
    */
   onAgentDisconnect(callback: (agent: AgentConnectionInfo) => void): () => void {
     this.assertNotDestroyed();
@@ -181,7 +251,16 @@ export class Store<TConfig extends ConfigSchema> {
   // ===========================================================================
 
   /**
-   * Get all connected agents, optionally filtered.
+   * Get all connected agents, optionally filtered by location.
+   *
+   * @param query - Optional filter by context, tabId, frameId
+   * @returns Array of connected agent info
+   * @throws {LifecycleError} If the store has been destroyed
+   *
+   * @example
+   * const allAgents = store.getAgents();
+   * const contentScripts = store.getAgents({ context: 'contentscript' });
+   * const tab42Agents = store.getAgents({ tabId: 42 });
    */
   getAgents(query?: Partial<BrowserLocation>): AgentConnectionInfo[] {
     this.assertNotDestroyed();
@@ -200,7 +279,15 @@ export class Store<TConfig extends ConfigSchema> {
 
   /**
    * Destroy the store and clean up all resources.
-   * Call this for testing or HMR cleanup.
+   * After calling this, the store cannot be used. Use for testing or HMR cleanup.
+   *
+   * @param options.clearPersisted - If true, also clears persisted storage data
+   *
+   * @example
+   * // In tests
+   * afterEach(() => {
+   *   store.destroy({ clearPersisted: true });
+   * });
    */
   destroy(options?: { clearPersisted?: boolean }): void {
     if (this.isDestroyed) return;
@@ -371,9 +458,7 @@ export class Store<TConfig extends ConfigSchema> {
 
   private assertNotDestroyed(): void {
     if (this.isDestroyed) {
-      throw new Error(
-        `Store "${this.config.name}" has been destroyed and cannot be used.`
-      );
+      throw new LifecycleError(this.config.name, "store");
     }
   }
 }
@@ -383,10 +468,31 @@ export class Store<TConfig extends ConfigSchema> {
 // =============================================================================
 
 /**
- * Create a new store instance.
+ * Create a new Crann store instance.
+ *
+ * This should be called in your service worker/background script.
+ * Each call creates a new, independent store instance (no singleton).
+ *
+ * @param config - Validated config from createConfig()
+ * @param options - Optional store options
+ * @param options.debug - Enable debug logging
+ * @param options.migrate - Migration function for schema version changes
+ * @returns A new Store instance
  *
  * @example
+ * // background.ts
+ * import { createConfig, createStore } from 'crann';
+ *
+ * const config = createConfig({
+ *   name: 'myFeature',
+ *   count: { default: 0, persist: 'local' },
+ * });
+ *
  * const store = createStore(config, { debug: true });
+ *
+ * store.subscribe((state, changes) => {
+ *   console.log('State changed:', changes);
+ * });
  */
 export function createStore<TConfig extends ConfigSchema>(
   config: ValidatedConfig<TConfig>,

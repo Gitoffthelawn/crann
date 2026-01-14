@@ -13,15 +13,14 @@ import type {
   DerivedState,
   DerivedActions,
   StateChanges,
-  isStateItem,
 } from "../store/types";
 import type {
   AgentOptions,
   AgentAPI,
   AgentConnectionInfo,
   StateSubscriber,
-  ConnectionStatus,
 } from "./types";
+import { LifecycleError } from "../errors";
 
 // =============================================================================
 // Agent Class
@@ -358,9 +357,7 @@ export class Agent<TConfig extends ConfigSchema> implements AgentAPI<TConfig> {
 
   private assertNotDisconnected(): void {
     if (this._isDisconnected) {
-      throw new Error(
-        `Agent for store "${this.config.name}" has been disconnected and cannot be used.`
-      );
+      throw new LifecycleError(this.config.name, "agent");
     }
   }
 }
@@ -370,12 +367,39 @@ export class Agent<TConfig extends ConfigSchema> implements AgentAPI<TConfig> {
 // =============================================================================
 
 /**
- * Connect to a Crann store.
+ * Connect to a Crann store from a client context.
+ *
+ * This should be called in content scripts, popup, sidepanel, or other
+ * extension contexts that need to access the store. Uses the config's
+ * `name` to find and connect to the matching store in the service worker.
+ *
+ * @param config - Validated config from createConfig() (must match store's config)
+ * @param options - Optional connection options
+ * @param options.debug - Enable debug logging
+ * @returns An Agent instance for interacting with the store
  *
  * @example
- * const agent = connectStore(config, { debug: true });
+ * // content.ts
+ * import { createConfig, connectStore } from 'crann';
+ *
+ * const config = createConfig({
+ *   name: 'myFeature',
+ *   count: { default: 0, persist: 'local' },
+ * });
+ *
+ * const agent = connectStore(config);
+ *
+ * // Wait for connection and initial state
  * const state = await agent.ready();
- * console.log(state.count);
+ * console.log('Initial count:', state.count);
+ *
+ * // Subscribe to changes
+ * agent.subscribe((changes, state) => {
+ *   console.log('State changed:', changes);
+ * });
+ *
+ * // Call actions
+ * await agent.actions.increment();
  */
 export function connectStore<TConfig extends ConfigSchema>(
   config: ValidatedConfig<TConfig>,

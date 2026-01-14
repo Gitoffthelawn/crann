@@ -24,7 +24,57 @@ describe('createConfig', () => {
   it('should throw if name is missing', () => {
     expect(() => {
       createConfig({ count: { default: 0 } } as any);
-    }).toThrow("requires a 'name' property");
+    }).toThrow("'name' is required");
+  });
+
+  it('should throw if name is empty', () => {
+    // Empty string is falsy, so it triggers the "required" check
+    expect(() => {
+      createConfig({ name: '', count: { default: 0 } });
+    }).toThrow("'name' is required");
+  });
+
+  it('should throw if name has invalid characters', () => {
+    expect(() => {
+      createConfig({ name: '123invalid', count: { default: 0 } });
+    }).toThrow("'name' must start with a letter");
+
+    expect(() => {
+      createConfig({ name: 'has spaces', count: { default: 0 } });
+    }).toThrow("'name' must start with a letter");
+  });
+
+  it('should accept valid name formats', () => {
+    expect(() => createConfig({ name: 'myStore' })).not.toThrow();
+    expect(() => createConfig({ name: 'my-store' })).not.toThrow();
+    expect(() => createConfig({ name: 'my_store' })).not.toThrow();
+    expect(() => createConfig({ name: 'MyStore123' })).not.toThrow();
+  });
+
+  it('should throw if version is invalid', () => {
+    expect(() => {
+      createConfig({ name: 'test', version: 0 } as any);
+    }).toThrow("'version' must be a positive integer");
+
+    expect(() => {
+      createConfig({ name: 'test', version: -1 } as any);
+    }).toThrow("'version' must be a positive integer");
+
+    expect(() => {
+      createConfig({ name: 'test', version: 1.5 } as any);
+    }).toThrow("'version' must be a positive integer");
+  });
+
+  it('should throw if scope is invalid', () => {
+    expect(() => {
+      createConfig({ name: 'test', item: { default: 0, scope: 'invalid' as any } });
+    }).toThrow("Invalid scope");
+  });
+
+  it('should throw if persist is invalid', () => {
+    expect(() => {
+      createConfig({ name: 'test', item: { default: 0, persist: 'invalid' as any } });
+    }).toThrow("Invalid persist");
   });
 
   it('should handle state items with scope', () => {

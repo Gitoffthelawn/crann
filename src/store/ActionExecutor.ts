@@ -15,6 +15,7 @@ import {
   ActionContext,
   ActionDefinition,
 } from "./types";
+import { ActionError, ValidationError } from "../errors";
 
 export class ActionExecutor<TConfig extends ConfigSchema> {
   private readonly config: ValidatedConfig<TConfig>;
@@ -36,6 +37,13 @@ export class ActionExecutor<TConfig extends ConfigSchema> {
 
   /**
    * Execute an action by name.
+   *
+   * @param actionName - The name of the action to execute
+   * @param args - Arguments to pass to the action handler
+   * @param agentInfo - Info about the calling agent
+   * @returns The result of the action handler
+   * @throws {ActionError} If the action doesn't exist or fails
+   * @throws {ValidationError} If action validation fails
    */
   async execute(
     actionName: string,
@@ -44,7 +52,7 @@ export class ActionExecutor<TConfig extends ConfigSchema> {
   ): Promise<unknown> {
     const actions = this.config.actions;
     if (!actions) {
-      throw new Error(`No actions defined in store "${this.config.name}"`);
+      throw new ActionError(actionName, this.config.name, "No actions defined");
     }
 
     const actionDef = actions[actionName] as ActionDefinition<
@@ -54,9 +62,7 @@ export class ActionExecutor<TConfig extends ConfigSchema> {
     > | undefined;
 
     if (!actionDef) {
-      throw new Error(
-        `Unknown action "${actionName}" in store "${this.config.name}"`
-      );
+      throw new ActionError(actionName, this.config.name, "Unknown action");
     }
 
     // Validate arguments if validator is provided
@@ -64,10 +70,10 @@ export class ActionExecutor<TConfig extends ConfigSchema> {
       try {
         actionDef.validate(...args);
       } catch (error) {
-        throw new Error(
-          `Validation failed for action "${actionName}": ${
-            error instanceof Error ? error.message : String(error)
-          }`
+        throw new ValidationError(
+          actionName,
+          this.config.name,
+          error instanceof Error ? error.message : String(error)
         );
       }
     }
@@ -83,7 +89,15 @@ export class ActionExecutor<TConfig extends ConfigSchema> {
     };
 
     // Execute the handler
-    return actionDef.handler(ctx, ...args);
+    try {
+      return await actionDef.handler(ctx, ...args);
+    } catch (error) {
+      throw new ActionError(
+        actionName,
+        this.config.name,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   /**

@@ -101,7 +101,12 @@ export type ConfigSchema = {
   /** Action definitions */
   actions?: ActionsDefinition<any>;
   /** State item definitions (all other keys) */
-  [key: string]: string | number | StateItemDefinition<any> | ActionsDefinition<any> | undefined;
+  [key: string]:
+    | string
+    | number
+    | StateItemDefinition<any>
+    | ActionsDefinition<any>
+    | undefined;
 };
 
 /**
@@ -130,9 +135,8 @@ type StateKeys<T extends ConfigSchema> = {
 /**
  * Extract action keys from the actions object.
  */
-type ActionKeys<T extends ConfigSchema> = T["actions"] extends ActionsDefinition<any>
-  ? keyof T["actions"]
-  : never;
+type ActionKeys<T extends ConfigSchema> =
+  T["actions"] extends ActionsDefinition<any> ? keyof T["actions"] : never;
 
 // =============================================================================
 // Derived State Types
@@ -167,7 +171,9 @@ export type DerivedSharedState<T extends ConfigSchema> = OmitNever<{
  * Agent-scoped state (scope: 'agent').
  */
 export type DerivedAgentState<T extends ConfigSchema> = OmitNever<{
-  [K in StateKeys<T>]: T[K] extends StateItemDefinition<infer D> & { scope: "agent" }
+  [K in StateKeys<T>]: T[K] extends StateItemDefinition<infer D> & {
+    scope: "agent";
+  }
     ? D
     : never;
 }>;
@@ -179,17 +185,18 @@ export type DerivedAgentState<T extends ConfigSchema> = OmitNever<{
 /**
  * Extract the typed actions interface from config.
  */
-export type DerivedActions<T extends ConfigSchema> = T["actions"] extends ActionsDefinition<any>
-  ? {
-      [K in keyof T["actions"]]: T["actions"][K] extends ActionDefinition<
-        any,
-        infer TArgs,
-        infer TResult
-      >
-        ? (...args: TArgs) => Promise<TResult>
-        : never;
-    }
-  : Record<string, never>;
+export type DerivedActions<T extends ConfigSchema> =
+  T["actions"] extends ActionsDefinition<any>
+    ? {
+        [K in keyof T["actions"]]: T["actions"][K] extends ActionDefinition<
+          any,
+          infer TArgs,
+          infer TResult
+        >
+          ? (...args: TArgs) => Promise<TResult>
+          : never;
+      }
+    : Record<string, never>;
 
 // =============================================================================
 // Store & Agent Options
@@ -199,7 +206,11 @@ export type StoreOptions = {
   /** Enable debug logging */
   debug?: boolean;
   /** Migration function for schema version changes */
-  migrate?: (oldState: unknown, oldVersion: number, newVersion: number) => unknown;
+  migrate?: (
+    oldState: unknown,
+    oldVersion: number,
+    newVersion: number
+  ) => unknown;
 };
 
 export type AgentOptions = {
@@ -236,7 +247,9 @@ export type AgentConnectionInfo = {
 // Type Guards
 // =============================================================================
 
-export function isStateItem(item: unknown): item is StateItemDefinition<unknown> {
+export function isStateItem(
+  item: unknown
+): item is StateItemDefinition<unknown> {
   return (
     typeof item === "object" &&
     item !== null &&
@@ -245,7 +258,9 @@ export function isStateItem(item: unknown): item is StateItemDefinition<unknown>
   );
 }
 
-export function isActionDefinition(item: unknown): item is ActionDefinition<any, any[], any> {
+export function isActionDefinition(
+  item: unknown
+): item is ActionDefinition<any, any[], any> {
   return typeof item === "object" && item !== null && "handler" in item;
 }
 
@@ -256,6 +271,10 @@ export function isActionDefinition(item: unknown): item is ActionDefinition<any,
 /**
  * Creates a validated config object with proper type inference.
  * This is the single source of truth for store identity and shape.
+ *
+ * @param config - The store configuration object
+ * @returns A validated config with defaults filled in
+ * @throws {ConfigError} If the config is invalid
  *
  * @example
  * const config = createConfig({
@@ -273,9 +292,70 @@ export function isActionDefinition(item: unknown): item is ActionDefinition<any,
  *   },
  * });
  */
-export function createConfig<T extends ConfigSchema>(config: T): ValidatedConfig<T> {
+export function createConfig<T extends ConfigSchema>(
+  config: T
+): ValidatedConfig<T> {
+  // Import here to avoid circular dependency
+  const { ConfigError } = require("../errors");
+
+  // Validate name (null, undefined, and empty string are all falsy)
   if (!config.name) {
-    throw new Error("Crann config requires a 'name' property");
+    throw new ConfigError("'name' is required", "name");
+  }
+  if (typeof config.name !== "string") {
+    throw new ConfigError("'name' must be a string", "name");
+  }
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(config.name)) {
+    throw new ConfigError(
+      "'name' must start with a letter and contain only letters, numbers, underscores, and hyphens",
+      "name"
+    );
+  }
+
+  // Validate version
+  if (config.version !== undefined) {
+    if (typeof config.version !== "number" || !Number.isInteger(config.version) || config.version < 1) {
+      throw new ConfigError("'version' must be a positive integer", "version");
+    }
+  }
+
+  // Validate state items
+  for (const [key, item] of Object.entries(config)) {
+    if (key === "name" || key === "version" || key === "actions") continue;
+
+    if (isStateItem(item)) {
+      // Validate scope
+      if (item.scope !== undefined && item.scope !== Scope.Shared && item.scope !== Scope.Agent) {
+        throw new ConfigError(`Invalid scope '${item.scope}'. Must be 'shared' or 'agent'`, key);
+      }
+      // Validate persist
+      if (
+        item.persist !== undefined &&
+        item.persist !== Persist.Local &&
+        item.persist !== Persist.Session &&
+        item.persist !== Persist.None
+      ) {
+        throw new ConfigError(
+          `Invalid persist '${item.persist}'. Must be 'local', 'session', or 'none'`,
+          key
+        );
+      }
+    }
+  }
+
+  // Validate actions
+  if (config.actions !== undefined) {
+    if (typeof config.actions !== "object" || config.actions === null) {
+      throw new ConfigError("'actions' must be an object", "actions");
+    }
+    for (const [actionName, action] of Object.entries(config.actions)) {
+      if (!isActionDefinition(action)) {
+        throw new ConfigError(`Action '${actionName}' must have a 'handler' function`, `actions.${actionName}`);
+      }
+      if (typeof action.handler !== "function") {
+        throw new ConfigError(`Action '${actionName}' handler must be a function`, `actions.${actionName}`);
+      }
+    }
   }
 
   return {
@@ -289,4 +369,3 @@ export function createConfig<T extends ConfigSchema>(config: T): ValidatedConfig
 // =============================================================================
 
 export type { AgentInfo, BrowserLocation };
-
