@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node ./build.mjs",
-    "watch": "tsc --watch"
+    "watch": "node ./build.mjs --watch"
   },
   "dependencies": {
     "crann": "file:../..",
