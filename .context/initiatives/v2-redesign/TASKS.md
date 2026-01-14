@@ -41,6 +41,7 @@
 
 - [ ] Define new `ConfigItem` type with `scope` instead of `partition`
 - [ ] Define new `ActionDefinition` with `handler` receiving context object
+- [ ] Add `name` (required) and `version` (optional, default 1) to config schema
 - [ ] Create `createConfig<T>()` helper (or decide on `satisfies` pattern)
 - [ ] Update type inference (`DerivedState`, `DerivedSharedState`, `DerivedAgentState`)
 - [ ] Add `OmitNever` consistently to derived types
@@ -50,8 +51,8 @@
 
 - [ ] Create new `src/store/Store.ts`
 - [ ] Constructor takes config and options (no static getInstance)
-- [ ] Options interface: `{ name: string, version?: number, debug?: boolean, migrate?: fn }`
-- [ ] Validate `name` is provided (required)
+- [ ] Options interface: `{ debug?: boolean, migrate?: fn }` (name/version come from config)
+- [ ] Validate `config.name` is provided (required)
 - [ ] Implement `destroy()` method for cleanup
 - [ ] Export `createStore()` factory function
 
@@ -74,7 +75,7 @@
 - [ ] `hydrate()` - load from chrome.storage
 - [ ] `persist(key, value)` - save to chrome.storage
 - [ ] Implement structured key format: `crann:{name}:v{version}:{key}`
-  - [ ] Create `buildStorageKey(name, version, key)` helper
+  - [ ] Create `buildStorageKey(config, key)` helper (reads name/version from config)
   - [ ] Create `parseStorageKey(fullKey)` helper for cleanup utilities
 - [ ] Store metadata at `crann:{name}:__meta`
   - [ ] Track `version`, `createdAt`, `lastAccessed`
@@ -364,7 +365,7 @@ Use this section to record decisions made during implementation.
 
 ---
 
-### 2026-01-13 - Storage Key Structure & `name` Option
+### 2026-01-13 - Storage Key Structure & `name` in Config
 
 **Context:** The original `storagePrefix` option felt "janky" - it required users to provide a technical implementation detail rather than a meaningful name. Additionally, there was no collision detection, no cleanup utilities, and no clear structure for how keys would be organized in `chrome.storage`.
 
@@ -375,7 +376,7 @@ Use this section to record decisions made during implementation.
 3. Make prefix optional with auto-generated default
 4. Use hash-based keys to avoid collisions entirely
 
-**Decision:** Option 2 - Rename to `name`, structured keys `crann:{name}:v{version}:{key}`
+**Decision:** Option 2 - Require `name` in config, structured keys `crann:{name}:v{version}:{key}`
 
 **Rationale:**
 
@@ -384,14 +385,44 @@ Use this section to record decisions made during implementation.
 - Version in key path enables clean migrations without orphaned keys
 - Collision detection (throw in dev, warn in prod) catches mistakes early
 - Cleanup utilities (`clearOrphanedData`) solve the "old data lying around" problem
-- `name` is required for now - we can make it optional later if there's a good default strategy
+- `name` is required - placing it in config ensures both source and agent agree on store identity
 
 **Implementation:**
 
+- `name` and `version` live in `createConfig()`, not store options
 - Keys: `crann:{name}:v{version}:{key}` for state, `crann:{name}:__meta` for metadata
 - Collision detection checks `__meta` exists from another process
 - `store.destroy({ clearPersisted: true })` for full cleanup
 - Static `clearOrphanedData({ keepStores })` for maintenance
+
+---
+
+### 2026-01-14 - Store Identity in Config (Single Source of Truth)
+
+**Context:** The original design had `name` and `version` in `createStore()` options, but `connectStore()` had no way to specify which store to connect to. This was an oversight - agents need to know which store to connect to when multiple stores exist.
+
+**Options:**
+
+1. Add `name` to `connectStore()` options - requires specifying name in two places
+2. Embed `name` and `version` in `createConfig()` - single source of truth
+3. Default to "first store" when name omitted - magic behavior, potential confusion
+4. Auto-discovery based on config structure fingerprinting - overly complex
+
+**Decision:** Option 2 - Embed `name` (required) and `version` (optional, default 1) in `createConfig()`
+
+**Rationale:**
+
+- **Single source of truth** - The config already defines state shape; adding identity keeps everything together
+- **DRY** - Name isn't repeated in `createStore()` and `connectStore()`
+- **Module-like identity** - Similar to how Zustand/Jotai use imports for store identity, but works across extension context boundaries
+- **Type safety flows naturally** - Same config = same store = correct types
+- **Mirrors database connection strings** - Identity is part of the connection config, not separate
+
+**Implementation:**
+
+- `createConfig({ name: 'myFeature', version: 1, ... })`
+- Both `createStore(config)` and `connectStore(config)` read identity from config
+- Store options become just `{ debug?: boolean, migrate?: fn }`
 
 ---
 
@@ -404,4 +435,4 @@ Use this section to record decisions made during implementation.
 
 ---
 
-_Last updated: 2026-01-13_
+_Last updated: 2026-01-14_
