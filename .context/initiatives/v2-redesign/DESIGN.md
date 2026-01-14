@@ -160,10 +160,16 @@ With few current users and a goal of external adoption, now is the time for brea
 
 ### Config Schema
 
+The config is the single source of truth for a store - including its identity.
+
 ```typescript
 import { createConfig } from "crann";
 
 const config = createConfig({
+  // Store identity (required)
+  name: "myFeature", // Used for storage keys, agent connection routing
+  version: 1, // Schema version for migrations
+
   // State items
   count: {
     default: 0,
@@ -210,9 +216,8 @@ import { createStore } from 'crann';
 import { config } from './config';
 
 // Create store - NOT a singleton
+// Name and version come from config (single source of truth)
 const store = createStore(config, {
-  name: 'myFeature',  // Required - used for storage key namespacing
-  version: 1,         // Schema version for migrations
   debug: process.env.NODE_ENV === 'development',
 });
 
@@ -264,7 +269,7 @@ store.destroy();
 import { connectStore } from "crann";
 import { config } from "./config";
 
-// Connect to store
+// Connect to store - uses config.name to find the right store
 const agent = connectStore(config, {
   debug: process.env.NODE_ENV === "development",
 });
@@ -532,8 +537,8 @@ interface StoreMetadata {
 #### Why This Structure?
 
 1. **`crann:` prefix** - Avoids collisions with non-Crann data in `chrome.storage`
-2. **`{name}`** - User-provided store name for multi-store scenarios
-3. **`v{version}`** - Enables schema migrations without key collisions
+2. **`{name}`** - Store name from config, enables multi-store scenarios
+3. **`v{version}`** - Schema version from config, enables migrations without key collisions
 4. **`{key}`** - The actual state key from config
 
 #### Collision Detection
@@ -661,8 +666,11 @@ const config = {
   tabData: { default: null, partition: "instance" },
 };
 
-// v2
+// v2 - name and version are now part of config (single source of truth)
 const config = createConfig({
+  name: "myFeature", // Required - identifies store for connection and storage
+  version: 1, // Optional - schema version for migrations
+
   count: { default: 0, scope: "shared", persist: "local" },
   agentData: { default: null, scope: "agent" },
 });
@@ -677,10 +685,8 @@ const crann = create(config);
 
 // v2
 import { createStore } from "crann";
-const store = createStore(config, {
-  name: "myFeature", // Required for persistence
-  version: 1, // Optional, defaults to 1
-});
+// name and version are now in config (single source of truth)
+const store = createStore(config, { debug: true });
 ```
 
 ### Agent Connection
