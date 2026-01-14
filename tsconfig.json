@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2018",
     "module": "ESNext",
-    "lib": ["ES2018", "DOM"],
+    "lib": ["ES2018", "DOM", "WebWorker"],
     "outDir": "./dist",
     "rootDir": "./src",
     "moduleResolution": "node",
@@ -13,10 +13,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "experimentalDecorators": true,
-    "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "porter-source": ["../porter-source/dist"]
-    }
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
