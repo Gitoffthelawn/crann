@@ -128,12 +128,12 @@ With few current users and a goal of external adoption, now is the time for brea
 
 ### Medium Priority (Polish)
 
-| Problem               | Impact                   | Root Cause         |
-| --------------------- | ------------------------ | ------------------ |
-| No schema versioning  | Stale data on upgrade    | Not implemented    |
-| Crann class too large | Hard to maintain         | No decomposition   |
-| Porter types leak     | Coupling to transport    | Blurred boundaries |
-| Storage prefix trust  | Could hydrate wrong data | No validation      |
+| Problem                | Impact                   | Root Cause         |
+| ---------------------- | ------------------------ | ------------------ |
+| No schema versioning   | Stale data on upgrade    | Not implemented    |
+| Crann class too large  | Hard to maintain         | No decomposition   |
+| Porter types leak      | Coupling to transport    | Blurred boundaries |
+| Storage key collisions | Could hydrate wrong data | No validation      |
 
 ---
 
@@ -211,8 +211,9 @@ import { config } from './config';
 
 // Create store - NOT a singleton
 const store = createStore(config, {
+  name: 'myFeature',  // Required - used for storage key namespacing
+  version: 1,         // Schema version for migrations
   debug: process.env.NODE_ENV === 'development',
-  storagePrefix: 'myext_',
 });
 
 // Get state
@@ -500,6 +501,86 @@ class Logger {
 }
 ```
 
+### 7. Storage Key Structure & Collision Detection
+
+#### Key Format
+
+All persisted state uses structured keys with the `crann:` prefix:
+
+```
+crann:{name}:v{version}:{key}
+```
+
+Examples:
+
+```
+crann:myFeature:v1:count
+crann:myFeature:v1:user
+crann:myFeature:__meta
+```
+
+The `__meta` key stores store metadata (without version, since it tracks version):
+
+```typescript
+interface StoreMetadata {
+  version: number;
+  createdAt: number;
+  lastAccessed: number;
+}
+```
+
+#### Why This Structure?
+
+1. **`crann:` prefix** - Avoids collisions with non-Crann data in `chrome.storage`
+2. **`{name}`** - User-provided store name for multi-store scenarios
+3. **`v{version}`** - Enables schema migrations without key collisions
+4. **`{key}`** - The actual state key from config
+
+#### Collision Detection
+
+When `createStore()` is called:
+
+1. Check if `crann:{name}:__meta` already exists in storage
+2. If exists AND current process didn't create it → collision detected
+3. In development: throw descriptive error
+4. In production: log warning (don't crash user's extension)
+
+```typescript
+// In development
+throw new CrannError(
+  `Store name "${name}" is already in use. Each store must have a unique name. ` +
+    `If you're trying to connect to an existing store, use connectStore() instead.`
+);
+```
+
+We track "current process" stores in memory to allow the same store to be referenced multiple times in a codebase without false positives.
+
+#### Cleanup Utilities
+
+For orphaned data from removed stores or old versions:
+
+```typescript
+// Clear all data for a specific store (including all versions)
+await store.clearPersistedData();
+
+// Static utility to find and remove orphaned Crann data
+import { clearOrphanedData } from "crann";
+const removed = await clearOrphanedData({
+  keepStores: ["myFeature", "otherStore"], // Store names to preserve
+  dryRun: true, // Preview what would be removed
+});
+// Returns: { keys: ['crann:oldStore:v1:count', ...], count: 5 }
+
+// Actually remove
+await clearOrphanedData({ keepStores: ["myFeature", "otherStore"] });
+```
+
+The `store.destroy()` method accepts an option to clear persisted data:
+
+```typescript
+store.destroy({ clearPersisted: true }); // Removes all storage keys for this store
+```
+
 ---
 
 ## Implementation Roadmap
@@ -596,7 +677,10 @@ const crann = create(config);
 
 // v2
 import { createStore } from "crann";
-const store = createStore(config);
+const store = createStore(config, {
+  name: "myFeature", // Required for persistence
+  version: 1, // Optional, defaults to 1
+});
 ```
 
 ### Agent Connection

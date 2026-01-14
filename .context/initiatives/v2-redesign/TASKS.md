@@ -50,6 +50,8 @@
 
 - [ ] Create new `src/store/Store.ts`
 - [ ] Constructor takes config and options (no static getInstance)
+- [ ] Options interface: `{ name: string, version?: number, debug?: boolean, migrate?: fn }`
+- [ ] Validate `name` is provided (required)
 - [ ] Implement `destroy()` method for cleanup
 - [ ] Export `createStore()` factory function
 
@@ -71,12 +73,26 @@
 - [ ] Extract into `src/store/Persistence.ts`
 - [ ] `hydrate()` - load from chrome.storage
 - [ ] `persist(key, value)` - save to chrome.storage
+- [ ] Implement structured key format: `crann:{name}:v{version}:{key}`
+  - [ ] Create `buildStorageKey(name, version, key)` helper
+  - [ ] Create `parseStorageKey(fullKey)` helper for cleanup utilities
+- [ ] Store metadata at `crann:{name}:__meta`
+  - [ ] Track `version`, `createdAt`, `lastAccessed`
 - [ ] Add schema versioning
-  - [ ] Store `__version` in storage
-  - [ ] Add `version` and `migrate` options to config
+  - [ ] Read version from `__meta`
+  - [ ] Add `version` and `migrate` options to store options
   - [ ] Call migrate on version mismatch
+- [ ] Implement collision detection
+  - [ ] On createStore(), check if `__meta` exists from another process
+  - [ ] Track active stores in memory (Set) to avoid false positives
+  - [ ] In dev: throw `CrannError` with helpful message
+  - [ ] In prod: log warning to console
 - [ ] Fix: validate keys against config before hydrating
 - [ ] Fix: only hydrate keys that exist in current config
+- [ ] Implement cleanup utilities
+  - [ ] `store.clearPersistedData()` - clears all keys for this store
+  - [ ] `store.destroy({ clearPersisted: true })` option
+  - [ ] Static `clearOrphanedData({ keepStores, dryRun })` utility
 
 ### 1.5 AgentRegistry Module
 
@@ -345,6 +361,37 @@ Use this section to record decisions made during implementation.
 - "agent" sidesteps the tab vs frame debate entirely by aligning with Crann's existing terminology
 - "shared" avoids collision with JavaScript's `global` object in Node/service workers
 - The pairing is intuitive: "Is this state shared across all agents, or specific to this agent?"
+
+---
+
+### 2026-01-13 - Storage Key Structure & `name` Option
+
+**Context:** The original `storagePrefix` option felt "janky" - it required users to provide a technical implementation detail rather than a meaningful name. Additionally, there was no collision detection, no cleanup utilities, and no clear structure for how keys would be organized in `chrome.storage`.
+
+**Options:**
+
+1. Keep `storagePrefix` as-is, add validation later
+2. Rename to `name`, add `crann:` prefix automatically
+3. Make prefix optional with auto-generated default
+4. Use hash-based keys to avoid collisions entirely
+
+**Decision:** Option 2 - Rename to `name`, structured keys `crann:{name}:v{version}:{key}`
+
+**Rationale:**
+
+- `name` is user-focused ("name your store") vs implementation-focused ("provide a prefix")
+- `crann:` prefix guarantees no collision with non-Crann data
+- Version in key path enables clean migrations without orphaned keys
+- Collision detection (throw in dev, warn in prod) catches mistakes early
+- Cleanup utilities (`clearOrphanedData`) solve the "old data lying around" problem
+- `name` is required for now - we can make it optional later if there's a good default strategy
+
+**Implementation:**
+
+- Keys: `crann:{name}:v{version}:{key}` for state, `crann:{name}:__meta` for metadata
+- Collision detection checks `__meta` exists from another process
+- `store.destroy({ clearPersisted: true })` for full cleanup
+- Static `clearOrphanedData({ keepStores })` for maintenance
 
 ---
 
