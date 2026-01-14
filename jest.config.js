@@ -7,7 +7,10 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts'],
   coverageDirectory: 'coverage',
-  // Mock browser APIs
-  setupFilesAfterEnv: ['<rootDir>/src/store/__tests__/setup.ts'],
+  // Mock browser APIs - order matters, agent setup extends store setup
+  setupFilesAfterEnv: [
+    '<rootDir>/src/store/__tests__/setup.ts',
+    '<rootDir>/src/agent/__tests__/setup.ts',
+  ],
 };
 
