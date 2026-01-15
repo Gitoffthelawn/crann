@@ -484,16 +484,25 @@ await agent.actions.increment(5);
 
 ## Why Crann?
 
-Browser extensions have multiple isolated contexts that need to share state:
+Browser extensions have multiple isolated contexts (content scripts, popup, devtools, sidepanel) that need to share state. The traditional approach using `sendMessage`/`onMessage` forces a painful pattern:
 
-- **Service Worker** - Background logic and events
-- **Content Scripts** - Injected into web pages
-- **Popup** - Extension icon click UI
-- **Side Panels, DevTools** - Other specialized contexts
+[![Message Router Problem](https://mermaid.ink/img/pako:eNp9k2tvmzAUhv-KZSlikyjCEBLgwyJK2FapbSJwVbVhihi4BDXYyJi2WZT_PodcmtvmT4f3PK998DlewpRlBLqw01kWtBAuWCpiRkqiuEDJEv6qrFadTkxf5uw9nSVcgNswpkCuuvmd86SaAS8nVNSTGLYB8BkV5EPUMfy1AdfLj9CkTUggSnlRCYCO0sZp2jhIj0eTMaua6kAa4smQvAnG5vVWJTSL6Ulp0aMsKyL8rUgJeGT8lfCjsrKCk1QUjAJ8_amGowcchNJ5R-o6yQkIWSNOnJ_RwWE32P8pbfV7IdLZl7LONbGoyNcj47-PbS8CSX-a1AQoPwI8jbCHA-XM7xt7KvoPZe6pMLj1nqZ4NMXe9QWwuwe_B_IXpkMPexcwa489REE49Xx8M7q_wPUkp2naeeJ-t8FgMDjKtr07aaIcGXB19W3bjZ1mnGnj0Zk0xGfSJm7lTZ-gCkvCy6TI5PAv11AM28GPoSvD9ejHMKYrySWNYNGCptAVvCEq5KzJZ9B9Sea1_GqqLBFkWCRyCsq9WiX0mbFyZ5Gf0F3CD-gamqMjByHLNsyurfdtU4UL6CK9r3Wdfh_pes80bKuPVir80-6ga47joC6ykWEaXcswbRXmfF339iwub41wnzVUQLdnWSokWSEYv9u87PaBr_4CI3YYvA?type=png)](https://mermaid.live/edit#pako:eNp9k2tvmzAUhv-KZSlikyjCEBLgwyJK2FapbSJwVbVhihi4BDXYyJi2WZT_PodcmtvmT4f3PK998DlewpRlBLqw01kWtBAuWCpiRkqiuEDJEv6qrFadTkxf5uw9nSVcgNswpkCuuvmd86SaAS8nVNSTGLYB8BkV5EPUMfy1AdfLj9CkTUggSnlRCYCO0sZp2jhIj0eTMaua6kAa4smQvAnG5vVWJTSL6Ulp0aMsKyL8rUgJeGT8lfCjsrKCk1QUjAJ8_amGowcchNJ5R-o6yQkIWSNOnJ_RwWE32P8pbfV7IdLZl7LONbGoyNcj47-PbS8CSX-a1AQoPwI8jbCHA-XM7xt7KvoPZe6pMLj1nqZ4NMXe9QWwuwe_B_IXpkMPexcwa489REE49Xx8M7q_wPUkp2naeeJ-t8FgMDjKtr07aaIcGXB19W3bjZ1mnGnj0Zk0xGfSJm7lTZ-gCkvCy6TI5PAv11AM28GPoSvD9ejHMKYrySWNYNGCptAVvCEq5KzJZ9B9Sea1_GqqLBFkWCRyCsq9WiX0mbFyZ5Gf0F3CD-gamqMjByHLNsyurfdtU4UL6CK9r3Wdfh_pes80bKuPVir80-6ga47joC6ykWEaXcswbRXmfF339iwub41wnzVUQLdnWSokWSEYv9u87PaBr_4CI3YYvA)
 
-Traditionally, this requires complex `chrome.runtime.sendMessage` / `onMessage` patterns. Crann eliminates this boilerplate by providing a central state hub that all contexts can connect to.
+**The problem with `sendMessage` / `onMessage`:**
 
-![Traditional vs Crann Architecture](img/with_crann.png)
+- Agents can't message each other directly—everything routes through the service worker
+- Your service worker becomes a message router with growing `switch/case` statements
+- Every new feature means more message types, more handlers, more coupling
+- Manual async handling (`return true` in Chrome, different in Firefox)
+- Hand-rolled TypeScript types that may or may not stay in sync
+
+**With Crann:**
+
+- Define your state and actions in one place
+- Agents sync automatically through the central store
+- Full TypeScript inference—no manual type definitions
+- No message routing, no relay logic, no `return true`
+- Focus on your features, not the plumbing
 
 ---
 
