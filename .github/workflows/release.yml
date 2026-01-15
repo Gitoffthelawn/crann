@@ -2,14 +2,8 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to bump (patch, minor, major)'
-        required: true
-        default: 'patch'
+    tags:
+      - 'v*'  # Triggers on v1.0.0, v2.0.0, etc.
 
 jobs:
   release:
@@ -18,10 +12,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -31,25 +22,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Configure Git
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-
-      - name: Bump version
-        run: |
-          VERSION=${{ github.event.inputs.version || 'patch' }}
-          npm version $VERSION -m "Bump version to %s"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push changes
-        run: |
-          git push --follow-tags
-          git pull
-
       - name: Build
         run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify version matches tag
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: package.json version ($PACKAGE_VERSION) doesn't match tag ($TAG_VERSION)"
+            exit 1
+          fi
 
       - name: Create GitHub Release
         env:
