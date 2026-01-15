@@ -36,13 +36,13 @@
 import { createConfig, Persist } from "crann";
 
 export const config = createConfig({
-  name: "myExtension",      // Required: unique store name
-  version: 1,               // Optional: for migrations
-  
+  name: "myExtension", // Required: unique store name
+  version: 1, // Optional: for migrations
+
   // Define your state
   isEnabled: { default: false },
   count: { default: 0, persist: Persist.Local },
-  
+
   // Define actions (RPC)
   actions: {
     increment: {
@@ -79,10 +79,10 @@ const agent = connectStore(config);
 
 agent.onReady(() => {
   console.log("Connected! Current state:", agent.getState());
-  
+
   // Update state
   agent.setState({ isEnabled: true });
-  
+
   // Call actions
   agent.actions.increment(5);
 });
@@ -95,21 +95,18 @@ agent.onReady(() => {
 import { createCrannHooks } from "crann/react";
 import { config } from "./config";
 
-export const { useCrannState, useCrannActions, useCrannReady } = createCrannHooks(config);
+export const { useCrannState, useCrannActions, useCrannReady } =
+  createCrannHooks(config);
 
 // Counter.tsx
 function Counter() {
-  const count = useCrannState(s => s.count);
+  const count = useCrannState((s) => s.count);
   const { increment } = useCrannActions();
   const isReady = useCrannReady();
 
   if (!isReady) return <div>Loading...</div>;
 
-  return (
-    <button onClick={() => increment(1)}>
-      Count: {count}
-    </button>
-  );
+  return <button onClick={() => increment(1)}>Count: {count}</button>;
 }
 ```
 
@@ -123,25 +120,25 @@ import { createConfig, Scope, Persist } from "crann";
 const config = createConfig({
   // Required: unique identifier for this store
   name: "myStore",
-  
+
   // Optional: version number for migrations (default: 1)
   version: 1,
-  
+
   // State definitions
   count: { default: 0 },
-  
+
   // With persistence
-  theme: { 
+  theme: {
     default: "light" as "light" | "dark",
-    persist: Persist.Local,   // Persist.Local | Persist.Session | Persist.None
+    persist: Persist.Local, // Persist.Local | Persist.Session | Persist.None
   },
-  
+
   // Agent-scoped state (each tab/frame gets its own copy)
   selectedElement: {
     default: null as HTMLElement | null,
-    scope: Scope.Agent,       // Scope.Shared (default) | Scope.Agent
+    scope: Scope.Agent, // Scope.Shared (default) | Scope.Agent
   },
-  
+
   // Actions (RPC handlers)
   actions: {
     doSomething: {
@@ -167,7 +164,7 @@ The Store runs in the service worker and manages all state:
 import { createStore } from "crann";
 
 const store = createStore(config, {
-  debug: true,  // Enable debug logging
+  debug: true, // Enable debug logging
 });
 
 // Get current state
@@ -275,8 +272,8 @@ Two patterns for reading state:
 
 ```typescript
 // Selector pattern - returns selected value
-const count = useCrannState(s => s.count);
-const theme = useCrannState(s => s.settings.theme);
+const count = useCrannState((s) => s.count);
+const theme = useCrannState((s) => s.settings.theme);
 
 // Key pattern - returns [value, setValue] tuple
 const [count, setCount] = useCrannState("count");
@@ -331,20 +328,20 @@ Actions execute in the service worker but can be called from any context:
 const config = createConfig({
   name: "myStore",
   count: { default: 0 },
-  
+
   actions: {
     increment: {
       handler: async (ctx, amount: number = 1) => {
         const newCount = ctx.state.count + amount;
         // Option 1: Return state updates
         return { count: newCount };
-        
+
         // Option 2: Use ctx.setState
         // await ctx.setState({ count: newCount });
         // return { success: true };
       },
     },
-    
+
     fetchUser: {
       handler: async (ctx, userId: string) => {
         // Runs in service worker - can make network requests
@@ -376,10 +373,10 @@ Action handlers receive a context object:
 
 ```typescript
 interface ActionContext<TState> {
-  state: TState;                                    // Current state snapshot
-  setState: (partial: Partial<TState>) => Promise<void>;  // Update state
-  agentId: string;                                  // Calling agent's ID
-  agentLocation: BrowserLocation;                   // Tab/frame info
+  state: TState; // Current state snapshot
+  setState: (partial: Partial<TState>) => Promise<void>; // Update state
+  agentId: string; // Calling agent's ID
+  agentLocation: BrowserLocation; // Tab/frame info
 }
 ```
 
@@ -392,16 +389,16 @@ import { createConfig, Persist } from "crann";
 
 const config = createConfig({
   name: "myStore",
-  
+
   // No persistence (default) - resets on service worker restart
   volatile: { default: null },
-  
+
   // Local storage - persists across browser sessions
-  preferences: { 
+  preferences: {
     default: { theme: "light" },
     persist: Persist.Local,
   },
-  
+
   // Session storage - persists until browser closes
   sessionData: {
     default: {},
@@ -420,16 +417,16 @@ This prevents collisions and enables clean migrations.
 
 ### Key Changes
 
-| v1 | v2 |
-|----|----|
-| `create()` | `createStore()` |
-| `connect()` | `connectStore()` |
-| `Partition.Instance` | `Scope.Agent` |
-| `Partition.Service` | `Scope.Shared` |
-| `crann.set()` | `store.setState()` |
-| `crann.get()` | `store.getState()` |
+| v1                        | v2                        |
+| ------------------------- | ------------------------- |
+| `create()`                | `createStore()`           |
+| `connect()`               | `connectStore()`          |
+| `Partition.Instance`      | `Scope.Agent`             |
+| `Partition.Service`       | `Scope.Shared`            |
+| `crann.set()`             | `store.setState()`        |
+| `crann.get()`             | `store.getState()`        |
 | `callAction("name", arg)` | `agent.actions.name(arg)` |
-| Config object literal | `createConfig()` |
+| Config object literal     | `createConfig()`          |
 
 ### Migration Steps
 
@@ -443,7 +440,7 @@ const crann = create({
 
 // After (v2)
 const config = createConfig({
-  name: "myStore",  // Required in v2
+  name: "myStore", // Required in v2
   count: { default: 0 },
 });
 
@@ -454,10 +451,10 @@ const store = createStore(config);
 
 ```typescript
 // Before (v1)
-partition: Partition.Instance
+partition: Partition.Instance;
 
 // After (v2)
-scope: Scope.Agent
+scope: Scope.Agent;
 ```
 
 3. **Update React hooks:**
