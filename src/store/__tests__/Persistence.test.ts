@@ -5,59 +5,57 @@
  */
 
 // Mock data storage - needs to be defined before jest.mock
-const mockStorage = {
-  local: {} as Record<string, unknown>,
-  session: {} as Record<string, unknown>,
-};
+let mockLocalStorage: Record<string, unknown> = {};
+let mockSessionStorage: Record<string, unknown> = {};
 
 // Mock webextension-polyfill - must come before imports
 jest.mock("webextension-polyfill", () => ({
   storage: {
     local: {
       get: jest.fn(async (keys: string | string[] | null) => {
-        if (keys === null) return { ...mockStorage.local };
+        if (keys === null) return { ...mockLocalStorage };
         if (typeof keys === "string") {
-          return keys in mockStorage.local ? { [keys]: mockStorage.local[keys] } : {};
+          return keys in mockLocalStorage ? { [keys]: mockLocalStorage[keys] } : {};
         }
         const result: Record<string, unknown> = {};
         for (const key of keys) {
-          if (key in mockStorage.local) {
-            result[key] = mockStorage.local[key];
+          if (key in mockLocalStorage) {
+            result[key] = mockLocalStorage[key];
           }
         }
         return result;
       }),
       set: jest.fn(async (items: Record<string, unknown>) => {
-        Object.assign(mockStorage.local, items);
+        Object.assign(mockLocalStorage, items);
       }),
       remove: jest.fn(async (keys: string | string[]) => {
         const keysArray = typeof keys === "string" ? [keys] : keys;
         for (const key of keysArray) {
-          delete mockStorage.local[key];
+          delete mockLocalStorage[key];
         }
       }),
     },
     session: {
       get: jest.fn(async (keys: string | string[] | null) => {
-        if (keys === null) return { ...mockStorage.session };
+        if (keys === null) return { ...mockSessionStorage };
         if (typeof keys === "string") {
-          return keys in mockStorage.session ? { [keys]: mockStorage.session[keys] } : {};
+          return keys in mockSessionStorage ? { [keys]: mockSessionStorage[keys] } : {};
         }
         const result: Record<string, unknown> = {};
         for (const key of keys) {
-          if (key in mockStorage.session) {
-            result[key] = mockStorage.session[key];
+          if (key in mockSessionStorage) {
+            result[key] = mockSessionStorage[key];
           }
         }
         return result;
       }),
       set: jest.fn(async (items: Record<string, unknown>) => {
-        Object.assign(mockStorage.session, items);
+        Object.assign(mockSessionStorage, items);
       }),
       remove: jest.fn(async (keys: string | string[]) => {
         const keysArray = typeof keys === "string" ? [keys] : keys;
         for (const key of keysArray) {
-          delete mockStorage.session[key];
+          delete mockSessionStorage[key];
         }
       }),
     },
@@ -68,13 +66,11 @@ import browser from "webextension-polyfill";
 import { Persistence, clearOrphanedData } from "../Persistence";
 import { createConfig, Scope, Persist } from "../types";
 
-const mockBrowser = browser as jest.Mocked<typeof browser>;
-
 describe("Persistence", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockStorage.local = {};
-    mockStorage.session = {};
+    mockLocalStorage = {};
+    mockSessionStorage = {};
   });
 
   const config = createConfig({
@@ -93,7 +89,7 @@ describe("Persistence", () => {
       // We can verify key format indirectly through persist/hydrate
       await persistence.persist({ count: 42 });
 
-      expect(mockBrowser.storage.local.set).toHaveBeenCalledWith({
+      expect(browser.storage.local.set).toHaveBeenCalledWith({
         "crann:testStore:v1:count": 42,
       });
     });
@@ -108,7 +104,7 @@ describe("Persistence", () => {
       const persistence = new Persistence(versionedConfig);
       await persistence.persist({ value: 100 });
 
-      expect(mockBrowser.storage.local.set).toHaveBeenCalledWith({
+      expect(browser.storage.local.set).toHaveBeenCalledWith({
         "crann:myStore:v3:value": 100,
       });
     });
@@ -165,8 +161,9 @@ describe("Persistence", () => {
       const persistence = new Persistence(config);
       await persistence.hydrate();
 
-      expect(mockBrowser.storage.local.set).toHaveBeenCalled();
-      const setCall = mockBrowser.storage.local.set.mock.calls[0][0];
+      const setFn = browser.storage.local.set as jest.Mock;
+      expect(setFn).toHaveBeenCalled();
+      const setCall = setFn.mock.calls[0][0];
       expect(setCall).toHaveProperty("crann:testStore:__meta");
       expect(setCall["crann:testStore:__meta"]).toMatchObject({
         version: 1,
@@ -179,7 +176,7 @@ describe("Persistence", () => {
       const persistence = new Persistence(config);
       await persistence.persist({ count: 100 });
 
-      expect(mockBrowser.storage.local.set).toHaveBeenCalledWith({
+      expect(browser.storage.local.set).toHaveBeenCalledWith({
         "crann:testStore:v1:count": 100,
       });
     });
@@ -188,7 +185,7 @@ describe("Persistence", () => {
       const persistence = new Persistence(config);
       await persistence.persist({ sessionData: "newValue" });
 
-      expect(mockBrowser.storage.session.set).toHaveBeenCalledWith({
+      expect(browser.storage.session.set).toHaveBeenCalledWith({
         "crann:testStore:v1:sessionData": "newValue",
       });
     });
@@ -200,8 +197,8 @@ describe("Persistence", () => {
       // Instead, verify that calling persist with an empty object does nothing
       await persistence.persist({});
 
-      expect(mockBrowser.storage.local.set).not.toHaveBeenCalled();
-      expect(mockBrowser.storage.session.set).not.toHaveBeenCalled();
+      expect(browser.storage.local.set).not.toHaveBeenCalled();
+      expect(browser.storage.session.set).not.toHaveBeenCalled();
     });
 
     it("should persist multiple values to appropriate storage", async () => {
@@ -211,10 +208,10 @@ describe("Persistence", () => {
         sessionData: "sessionValue",
       });
 
-      expect(mockBrowser.storage.local.set).toHaveBeenCalledWith({
+      expect(browser.storage.local.set).toHaveBeenCalledWith({
         "crann:testStore:v1:count": 50,
       });
-      expect(mockBrowser.storage.session.set).toHaveBeenCalledWith({
+      expect(browser.storage.session.set).toHaveBeenCalledWith({
         "crann:testStore:v1:sessionData": "sessionValue",
       });
     });
@@ -230,15 +227,18 @@ describe("Persistence", () => {
       const persistence = new Persistence(config);
       await persistence.clearAll();
 
-      expect(mockBrowser.storage.local.remove).toHaveBeenCalled();
-      expect(mockBrowser.storage.session.remove).toHaveBeenCalled();
+      const localRemoveFn = browser.storage.local.remove as jest.Mock;
+      const sessionRemoveFn = browser.storage.session.remove as jest.Mock;
+
+      expect(localRemoveFn).toHaveBeenCalled();
+      expect(sessionRemoveFn).toHaveBeenCalled();
 
       // Verify the keys that were requested to be removed
-      const localRemoveCall = mockBrowser.storage.local.remove.mock.calls[0][0];
+      const localRemoveCall = localRemoveFn.mock.calls[0][0];
       expect(localRemoveCall).toContain("crann:testStore:v1:count");
       expect(localRemoveCall).toContain("crann:testStore:__meta");
 
-      const sessionRemoveCall = mockBrowser.storage.session.remove.mock.calls[0][0];
+      const sessionRemoveCall = sessionRemoveFn.mock.calls[0][0];
       expect(sessionRemoveCall).toContain("crann:testStore:v1:sessionData");
     });
   });
@@ -276,7 +276,7 @@ describe("clearOrphanedData", () => {
       dryRun: true,
     });
 
-    expect(mockBrowser.storage.local.remove).not.toHaveBeenCalled();
+    expect(browser.storage.local.remove).not.toHaveBeenCalled();
     expect(mockLocalStorage["crann:orphanStore:v1:key"]).toBe("data");
   });
 
@@ -290,10 +290,10 @@ describe("clearOrphanedData", () => {
       dryRun: false,
     });
 
-    expect(mockBrowser.storage.local.remove).toHaveBeenCalledWith(
+    expect(browser.storage.local.remove).toHaveBeenCalledWith(
       expect.arrayContaining(["crann:orphan:v1:key"])
     );
-    expect(mockBrowser.storage.session.remove).toHaveBeenCalledWith(
+    expect(browser.storage.session.remove).toHaveBeenCalledWith(
       expect.arrayContaining(["crann:orphan:v1:session"])
     );
   });

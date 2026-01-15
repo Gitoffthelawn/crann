@@ -1,10 +1,18 @@
 /** @type {import('jest').Config} */
-module.exports = {
+const commonConfig = {
   preset: 'ts-jest',
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  // Mock uuid ESM module
+  moduleNameMapper: {
+    '^uuid$': '<rootDir>/src/__mocks__/uuid.ts',
+  },
+};
+
+module.exports = {
+  ...commonConfig,
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverageFrom: ['src/**/*.ts', 'src/**/*.tsx', '!src/**/*.d.ts'],
   coverageDirectory: 'coverage',
   // Mock browser APIs - order matters, agent setup extends store setup
@@ -15,8 +23,8 @@ module.exports = {
   // Use jsdom for React component tests
   projects: [
     {
+      ...commonConfig,
       displayName: 'node',
-      preset: 'ts-jest',
       testEnvironment: 'node',
       testMatch: ['<rootDir>/src/**/*.test.ts'],
       setupFilesAfterEnv: [
@@ -25,8 +33,8 @@ module.exports = {
       ],
     },
     {
+      ...commonConfig,
       displayName: 'jsdom',
-      preset: 'ts-jest',
       testEnvironment: 'jsdom',
       testMatch: ['<rootDir>/src/**/*.test.tsx'],
     },
