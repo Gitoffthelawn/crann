@@ -1,4 +1,4 @@
-import { source, AgentInfo, connect, Message, AgentAPI } from "porter-source";
+import { source, AgentInfo, connect, Message, AgentAPI } from "../transport";
 import { createEndpoint } from "./endpoint";
 import { MessageEndpoint, CallMessage, RPCMessage } from "./types";
 import {

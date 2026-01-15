@@ -1,4 +1,4 @@
-import { BrowserLocation } from "porter-source";
+import { BrowserLocation } from "../transport";
 
 export type MessageMap = {
   call: {

@@ -16,9 +16,8 @@ import {
   StateChanges,
   MergeStateTypes,
 } from "./model/crann.model";
-import { AgentInfo, source, Agent } from "porter-source";
+import { AgentInfo, source, Agent, BrowserLocation } from "./transport";
 import { deepEqual } from "./utils/deepEqual";
-import { BrowserLocation } from "porter-source";
 import { trackStateChange } from "./utils/tracking";
 import { DebugManager } from "./utils/debug";
 import { createCrannRPCAdapter } from "./rpc/adapter";

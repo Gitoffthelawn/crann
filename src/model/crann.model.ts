@@ -1,4 +1,4 @@
-import { AgentInfo, BrowserLocation } from "porter-source";
+import { AgentInfo, BrowserLocation } from "../transport";
 
 export const Partition = {
   Instance: "instance" as const,

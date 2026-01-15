@@ -80,11 +80,15 @@ const build = () => {
 // Initial build
 build();
 
-// Watch for file changes in src directory
-chokidar.watch(srcDir).on('change', (event, path) => {
-  console.log(`Rebuilding => File ${event} has been changed`);
-  build();
-});
+// Watch for file changes only if --watch or -w flag is passed
+const shouldWatch = process.argv.includes('--watch') || process.argv.includes('-w');
+if (shouldWatch) {
+  console.log('Watching for changes...');
+  chokidar.watch(srcDir).on('change', (event, path) => {
+    console.log(`Rebuilding => File ${event} has been changed`);
+    build();
+  });
+}
 
 // Function to ensure directory exists
 function ensureDirExists(dir) {
