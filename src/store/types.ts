@@ -314,7 +314,11 @@ export function createConfig<T extends ConfigSchema>(
 
   // Validate version
   if (config.version !== undefined) {
-    if (typeof config.version !== "number" || !Number.isInteger(config.version) || config.version < 1) {
+    if (
+      typeof config.version !== "number" ||
+      !Number.isInteger(config.version) ||
+      config.version < 1
+    ) {
       throw new ConfigError("'version' must be a positive integer", "version");
     }
   }
@@ -325,8 +329,15 @@ export function createConfig<T extends ConfigSchema>(
 
     if (isStateItem(item)) {
       // Validate scope
-      if (item.scope !== undefined && item.scope !== Scope.Shared && item.scope !== Scope.Agent) {
-        throw new ConfigError(`Invalid scope '${item.scope}'. Must be 'shared' or 'agent'`, key);
+      if (
+        item.scope !== undefined &&
+        item.scope !== Scope.Shared &&
+        item.scope !== Scope.Agent
+      ) {
+        throw new ConfigError(
+          `Invalid scope '${item.scope}'. Must be 'shared' or 'agent'`,
+          key
+        );
       }
       // Validate persist
       if (
@@ -350,10 +361,16 @@ export function createConfig<T extends ConfigSchema>(
     }
     for (const [actionName, action] of Object.entries(config.actions)) {
       if (!isActionDefinition(action)) {
-        throw new ConfigError(`Action '${actionName}' must have a 'handler' function`, `actions.${actionName}`);
+        throw new ConfigError(
+          `Action '${actionName}' must have a 'handler' function`,
+          `actions.${actionName}`
+        );
       }
       if (typeof action.handler !== "function") {
-        throw new ConfigError(`Action '${actionName}' handler must be a function`, `actions.${actionName}`);
+        throw new ConfigError(
+          `Action '${actionName}' handler must be a function`,
+          `actions.${actionName}`
+        );
       }
     }
   }
