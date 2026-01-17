@@ -378,7 +378,7 @@ export class Store<TConfig extends ConfigSchema> {
       rpc: async (message, agentInfo) => {
         if (!agentInfo) return;
 
-        const { actionName, args } = message.payload;
+        const { callId, actionName, args } = message.payload;
         try {
           const result = await this.actionExecutor.execute(
             actionName,
@@ -388,7 +388,7 @@ export class Store<TConfig extends ConfigSchema> {
           this.porter.post(
             {
               action: "rpcResult",
-              payload: { actionName, result, success: true },
+              payload: { callId, actionName, result, success: true },
             },
             agentInfo.location
           );
@@ -397,6 +397,7 @@ export class Store<TConfig extends ConfigSchema> {
             {
               action: "rpcResult",
               payload: {
+                callId,
                 actionName,
                 error: error instanceof Error ? error.message : String(error),
                 success: false,

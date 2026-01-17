@@ -242,11 +242,6 @@ export class Agent<TConfig extends ConfigSchema> implements AgentAPI<TConfig> {
         this._state = { ...this._state, ...changes };
         this.notifySubscribers(changes);
       },
-
-      rpcResult: (message) => {
-        // RPC results are handled by the action proxy's pending promises
-        // This is handled in createActionsProxy
-      },
     });
 
     // Handle disconnect/reconnect from porter
