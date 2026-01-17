@@ -215,6 +215,9 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
 
   /**
    * Hook to get typed actions with stable references.
+   *
+   * The returned object and all action methods are referentially stable,
+   * so they can safely be used in dependency arrays without causing re-renders.
    */
   function useCrannActions(): DerivedActions<TConfig> {
     const agent = useAgent();
@@ -223,21 +226,28 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
     const agentRef = useRef<AgentAPI<TConfig> | null>(null);
     agentRef.current = agent;
 
+    // Cache for action wrappers to ensure stable references
+    const actionsCacheRef = useRef<Record<string, (...args: unknown[]) => Promise<unknown>>>({});
+
     // Return stable proxy that delegates to agent.actions
     const actionsRef = useRef<DerivedActions<TConfig> | null>(null);
 
     if (!actionsRef.current) {
       actionsRef.current = new Proxy({} as DerivedActions<TConfig>, {
         get: (_target, actionName: string) => {
-          return async (...args: unknown[]) => {
-            const currentAgent = agentRef.current;
-            if (!currentAgent) {
-              throw new Error(
-                `Cannot call action "${actionName}" before agent is connected`
-              );
-            }
-            return (currentAgent.actions as any)[actionName](...args);
-          };
+          // Return cached wrapper if it exists, otherwise create and cache it
+          if (!actionsCacheRef.current[actionName]) {
+            actionsCacheRef.current[actionName] = async (...args: unknown[]) => {
+              const currentAgent = agentRef.current;
+              if (!currentAgent) {
+                throw new Error(
+                  `Cannot call action "${actionName}" before agent is connected`
+                );
+              }
+              return (currentAgent.actions as any)[actionName](...args);
+            };
+          }
+          return actionsCacheRef.current[actionName];
         },
       });
     }
