@@ -16,6 +16,7 @@ import {
   DerivedAgentState,
   StateChanges,
   StateChangeListener,
+  StateSubscriber,
   AgentConnectionInfo,
   isStateItem,
   Scope,
@@ -40,7 +41,7 @@ export class Store<TConfig extends ConfigSchema> {
   private readonly agentRegistry: AgentRegistry;
   private readonly actionExecutor: ActionExecutor<TConfig>;
 
-  private readonly stateChangeListeners: Set<StateChangeListener<TConfig>> = new Set();
+  private readonly stateChangeListeners: Set<StateSubscriber<TConfig>> = new Set();
   private readonly agentConnectListeners: Set<(agent: AgentConnectionInfo) => void> = new Set();
   private readonly agentDisconnectListeners: Set<(agent: AgentConnectionInfo) => void> = new Set();
 
@@ -188,21 +189,46 @@ export class Store<TConfig extends ConfigSchema> {
   /**
    * Subscribe to state changes. Called whenever state is updated.
    *
-   * @param listener - Callback receiving (state, changes, agent?)
+   * Can subscribe to all changes or filter by specific keys.
+   *
+   * @param callbackOrKeys - Either a callback for all changes, or an array of keys to filter by
+   * @param maybeCallback - Callback when first arg is keys array
    * @returns Unsubscribe function
    * @throws {LifecycleError} If the store has been destroyed
    *
    * @example
+   * // Subscribe to all changes
    * const unsubscribe = store.subscribe((state, changes, agent) => {
    *   console.log('State changed:', changes);
    * });
-   * // Later: unsubscribe();
+   *
+   * // Subscribe to specific keys only
+   * const unsubscribe = store.subscribe(['active', 'initialized'], (state, changes, agent) => {
+   *   // Only called when 'active' or 'initialized' change
+   *   console.log('Relevant state changed:', changes);
+   * });
    */
-  subscribe(listener: StateChangeListener<TConfig>): () => void {
+  subscribe(
+    callbackOrKeys: StateChangeListener<TConfig> | Array<keyof DerivedState<TConfig>>,
+    maybeCallback?: StateChangeListener<TConfig>
+  ): () => void {
     this.assertNotDestroyed();
-    this.stateChangeListeners.add(listener);
+
+    let keys: Array<keyof DerivedState<TConfig>> | undefined;
+    let callback: StateChangeListener<TConfig>;
+
+    if (typeof callbackOrKeys === "function") {
+      callback = callbackOrKeys;
+    } else {
+      keys = callbackOrKeys;
+      callback = maybeCallback!;
+    }
+
+    const subscriber: StateSubscriber<TConfig> = { keys, callback };
+    this.stateChangeListeners.add(subscriber);
+
     return () => {
-      this.stateChangeListeners.delete(listener);
+      this.stateChangeListeners.delete(subscriber);
     };
   }
 
@@ -427,9 +453,21 @@ export class Store<TConfig extends ConfigSchema> {
       ? this.porter.getAgentById(agentId)?.info
       : undefined;
 
-    // Notify local listeners
-    this.stateChangeListeners.forEach((listener) => {
-      listener(state, changes, agentInfo);
+    // Notify local listeners (filtered by keys if specified)
+    this.stateChangeListeners.forEach((subscriber) => {
+      // If subscriber has specific keys, check if any changed
+      if (subscriber.keys) {
+        const hasRelevantChange = subscriber.keys.some(
+          (key) => key in changes
+        );
+        if (!hasRelevantChange) return;
+      }
+
+      try {
+        subscriber.callback(state, changes, agentInfo);
+      } catch (error) {
+        console.error("[Crann Store] Error in subscriber callback:", error);
+      }
     });
 
     // Notify connected agents

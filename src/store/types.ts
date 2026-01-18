@@ -235,6 +235,14 @@ export type StateChangeListener<T extends ConfigSchema> = (
   agent?: AgentInfo
 ) => void;
 
+/**
+ * Internal subscriber type for Store with optional key filtering.
+ */
+export type StateSubscriber<T extends ConfigSchema> = {
+  keys?: Array<keyof DerivedState<T>>;
+  callback: StateChangeListener<T>;
+};
+
 export type AgentConnectionInfo = {
   id: string;
   tabId: number;
