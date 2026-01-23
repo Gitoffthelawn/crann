@@ -11,12 +11,7 @@
 - **Full TypeScript support**: Strong type inference and safety
 - **Universal compatibility**: Works across all Web Extension contexts
 - **Reactive updates**: Automatic state synchronization via subscriptions
-
-## Active Initiatives
-
-| Initiative                                         | Status   | Description                                                         |
-| -------------------------------------------------- | -------- | ------------------------------------------------------------------- |
-| [v2-redesign](./initiatives/v2-redesign/DESIGN.md) | Planning | Major version with breaking API changes, architectural improvements |
+- **Typed RPC Actions**: Execute service worker logic from any context with full type safety
 
 ## Architecture
 
@@ -28,7 +23,7 @@ Crann uses a **service worker as the central state hub** with client connections
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │  Content Script │    │     Popup       │    │   Side Panel    │
 │                 │    │                 │    │                 │
-│   connect()     │    │   connect()     │    │   connect()     │
+│ connectStore()  │    │ connectStore()  │    │ connectStore()  │
 └─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
           │                      │                      │
           └──────────────────────┼──────────────────────┘
@@ -36,116 +31,89 @@ Crann uses a **service worker as the central state hub** with client connections
                     ┌─────────────▼───────────┐
                     │    Service Worker       │
                     │                         │
-                    │      create()           │
-                    │   (State Hub)           │
+                    │     createStore()       │
+                    │     (State Hub)         │
                     └─────────────────────────┘
 ```
 
 ### State Management Features
 
-1. **Partitioned State**: Support for context-specific state (`Partition.Instance`)
-2. **Persistence Options**: Local Storage (`Persistence.Local`) and Session Storage (`Persistence.Session`)
+1. **Scoped State**: Support for shared state (`scope: 'shared'`) and agent-specific state (`scope: 'agent'`)
+2. **Persistence Options**: Local Storage (`Persist.Local`) and Session Storage (`Persist.Session`)
 3. **Complex Types**: Full support for custom types with type assertions
-4. **RPC Actions**: Remote procedure calls that execute in the service worker context
+4. **RPC Actions**: Remote procedure calls that execute in the service worker context with full type safety
 
 ## Core Components
 
-### Service Worker (State Hub)
+### Store (Service Worker)
 
-- **Location**: `src/crann.ts` - Main Crann class
+- **Location**: `src/store/Store.ts` - Main Store class
 - **Purpose**: Central state management and synchronization
-- **Key Methods**: `create()`, `get()`, `set()`, `subscribe()`, `onInstanceReady()`
+- **Key Methods**: `createStore()`, `getState()`, `setState()`, `subscribe()`, `onAgentConnect()`
 
-### Client Connections
+### Agent (Client Connections)
 
-- **Location**: `src/crannAgent.ts` - Agent implementation
+- **Location**: `src/agent/Agent.ts` - Agent implementation
 - **Supported Contexts**: Content Scripts, Popup, Side Panels, DevTools, Options Pages
-- **Key Methods**: `connect()`, `get()`, `set()`, `subscribe()`, `callAction()`
+- **Key Methods**: `connectStore()`, `getState()`, `setState()`, `subscribe()`, `actions.*`
 
 ### Type System
 
-- **Location**: `src/model/crann.model.ts`
-- **Features**: Strong TypeScript inference, union type support, action definitions
-- **Recent Fix**: Resolved nullable state typing issue using `infer` keyword
+- **Location**: `src/store/types.ts`
+- **Features**: Strong TypeScript inference, union type support, action definitions, `createConfig()` helper
+- **Key Types**: `ConfigSchema`, `DerivedState`, `DerivedActions`, `ActionContext`
 
 ### RPC System
 
 - **Location**: `src/rpc/` directory
 - **Purpose**: Remote procedure calls between contexts
-- **Features**: Type-safe actions, validation, error handling, memory management
+- **Features**: Type-safe actions via `agent.actions.*`, validation, error handling
 
-## Key Dependencies
+### Transport Layer
 
-### Porter-Source
-
-- **Version**: ^1.1.20 (peer dependency)
-- **Purpose**: Underlying message passing and agent management
-- **Relationship**: Crann is built on top of Porter-Source's communication layer
-- **Future Consideration**: Likely to be merged into Crann as part of v2 redesign
-
-### Development Dependencies
-
-- **TypeScript**: ^5.5.4 - Primary language
-- **esbuild**: ^0.23.0 - Build system
-- **React**: ^18.2.0 - Optional React integration
-- **webextension-polyfill**: ^0.12.0 - Cross-browser compatibility
-
-## Porter-Source Integration & Debugging
-
-### Tight Coupling Relationship
-
-Crann and Porter-Source are tightly coupled libraries. During development, bugs or features often require changes in Porter-Source first, followed by updates in Crann. This creates a frequent need to examine Porter-Source code during debugging sessions.
-
-### Debug Access Setup
-
-To provide easy access to Porter-Source code for debugging and AI context:
-
-```bash
-# Get Porter source for debugging
-./scripts/debug-porter.sh
-
-# Clean up debug files
-./scripts/debug-porter.sh clean
-```
-
-This creates a `.porter-debug/` directory (git-ignored) containing the latest Porter-Source code for reference during debugging sessions.
-
-### When to Use Porter Debug Access
-
-- **Cross-library bugs**: Issues that span both Crann and Porter-Source
-- **Message passing problems**: Understanding the underlying communication layer
-- **Agent connection issues**: Debugging client connection failures
-- **Performance investigation**: Analyzing the porter-source communication patterns
-- **AI assistance**: Providing full context when AI helps debug complex issues
-
-### Future Integration Strategy
-
-**Decision (v2):** Porter-Source will be merged into Crann as `src/transport/` to eliminate the cross-repo development friction. See [v2-redesign/DESIGN.md](./initiatives/v2-redesign/DESIGN.md) for details.
+- **Location**: `src/transport/` directory
+- **Purpose**: Message passing and connection management (merged from porter-source)
+- **Note**: Internal implementation detail, not exposed in public API
 
 ## Project Structure
 
 ```
 src/
-├── crann.ts                 # Main Crann class (service worker)
-├── crannAgent.ts           # Client connection logic
-├── index.ts                # Public API exports
-├── model/
-│   └── crann.model.ts      # TypeScript type definitions
+├── index.ts                 # Public API exports
+├── errors.ts                # Custom error classes
+├── store/
+│   ├── Store.ts             # Main Store class
+│   ├── StateManager.ts      # State operations
+│   ├── Persistence.ts       # chrome.storage integration
+│   ├── AgentRegistry.ts     # Connected agent tracking
+│   ├── ActionExecutor.ts    # RPC action execution
+│   ├── types.ts             # Config schema and derived types
+│   └── __tests__/           # Unit tests
+├── agent/
+│   ├── Agent.ts             # Client agent class
+│   ├── types.ts             # Agent-specific types
+│   └── __tests__/           # Unit tests
+├── react/
+│   ├── index.ts             # React entry point (crann/react)
+│   ├── hooks.tsx            # React hooks implementation
+│   └── __tests__/           # Hook tests
+├── transport/
+│   ├── core/                # PorterAgent, PorterSource
+│   ├── managers/            # Connection and message handling
+│   └── porter.model.ts      # Transport types
 ├── rpc/
-│   ├── adapter.ts          # RPC communication adapter
-│   ├── endpoint.ts         # Message endpoint implementation
-│   ├── memory.ts           # Memory management
-│   ├── types.ts            # RPC type definitions
-│   └── encoding/           # Serialization strategies
-├── hooks/
-│   └── useCrannState.ts    # React integration
+│   ├── adapter.ts           # RPC communication adapter
+│   ├── endpoint.ts          # Message endpoint implementation
+│   └── encoding/            # Serialization strategies
 └── utils/
-    ├── agent.ts            # Agent utilities
-    ├── config.ts           # Configuration helpers
-    ├── debug.ts            # Debug management
-    ├── deepEqual.ts        # Deep equality checking
-    ├── logger.ts           # Logging system
-    └── tracking.ts         # State change tracking
+    ├── logger.ts            # Logging system
+    ├── deepEqual.ts         # Deep equality checking
+    └── ...                  # Other utilities
+
+# Legacy files (deprecated, for v1 compatibility)
+├── crann.ts                 # Legacy v1 Crann class
+├── crannAgent.ts            # Legacy v1 Agent
+└── model/crann.model.ts     # Legacy v1 types
 ```
 
 ## Build System
@@ -156,17 +124,20 @@ src/
 - **Outputs**:
   - CommonJS: `dist/cjs/index.js`
   - ESM: `dist/esm/index.js`
+  - React: `dist/cjs/react.js`, `dist/esm/react.js`
   - TypeScript Declarations: `dist/types/`
 - **Commands**:
   - `npm run build` - Full build (TypeScript + JavaScript)
   - `npm run build:ts` - TypeScript declarations only
   - `npm run build:js` - JavaScript bundles only
+  - `npm test` - Run tests
 
 ### Package Configuration
 
 - **Main**: `dist/cjs/index.js` (CommonJS)
 - **Module**: `dist/esm/index.js` (ESM)
 - **Types**: `dist/types/index.d.ts`
+- **Exports**: `crann` and `crann/react`
 - **Files**: Only `dist/` directory is published
 
 ## Usage Patterns
@@ -174,68 +145,93 @@ src/
 ### Basic State Synchronization
 
 ```typescript
-// Service Worker
-const crann = create({
+// config.ts
+import { createConfig, Persist } from "crann";
+
+export const config = createConfig({
+  name: "myExtension",
   isEnabled: { default: false },
-  counter: { default: 0, persist: Persistence.Local },
+  counter: { default: 0, persist: Persist.Local },
 });
 
+// Service Worker
+import { createStore } from "crann";
+import { config } from "./config";
+
+const store = createStore(config);
+store.subscribe((state, changes) => console.log("State changed:", changes));
+
 // Content Script
-const { get, set, subscribe } = connect();
-set({ isEnabled: true });
-subscribe((changes) => console.log("State changed:", changes));
+import { connectStore } from "crann";
+import { config } from "./config";
+
+const agent = connectStore(config);
+agent.onReady(() => {
+  agent.setState({ isEnabled: true });
+  agent.subscribe((changes) => console.log("State changed:", changes));
+});
 ```
 
 ### RPC Actions
 
 ```typescript
-// Service Worker
-const crann = create({
+// config.ts
+const config = createConfig({
+  name: "myExtension",
   counter: { default: 0 },
-  increment: {
-    handler: async (state, setState, target, amount) => {
-      const newValue = state.counter + amount;
-      await setState({ counter: newValue });
-      return newValue;
+  actions: {
+    increment: {
+      handler: async (ctx, amount: number = 1) => {
+        return { counter: ctx.state.counter + amount };
+      },
     },
   },
 });
 
 // Any Context
-const { callAction } = connect();
-const result = await callAction("increment", 5);
+const agent = connectStore(config);
+await agent.ready();
+const result = await agent.actions.increment(5); // Fully typed!
 ```
 
 ### React Integration
 
 ```typescript
-const useCrannState = createCrannStateHook(config);
+// hooks.ts
+import { createCrannHooks } from "crann/react";
+import { config } from "./config";
 
-function MyComponent() {
-  const { useStateItem, callAction } = useCrannState();
-  const [counter, setCounter] = useStateItem("counter");
+export const { useCrannState, useCrannActions, useCrannReady } =
+  createCrannHooks(config);
 
-  return (
-    <button onClick={() => callAction("increment", 1)}>Count: {counter}</button>
-  );
+// Component.tsx
+function Counter() {
+  const count = useCrannState((s) => s.counter);
+  const { increment } = useCrannActions();
+  const isReady = useCrannReady();
+
+  if (!isReady) return <div>Loading...</div>;
+
+  return <button onClick={() => increment(1)}>Count: {count}</button>;
 }
 ```
 
-## Testing & Examples
+## Testing
 
-### Primary Example
+### Unit Tests
+
+- **Location**: `src/**/__tests__/`
+- **Framework**: Jest with ts-jest
+- **Coverage**: StateManager, Persistence, AgentRegistry, ActionExecutor, Agent, React hooks
+
+### Test Extension
 
 - **Location**: `tests/extension/`
-- **Purpose**: Comprehensive test extension demonstrating all features
-- **Includes**: Background script, content script, popup, side panel integration
+- **Purpose**: Manual testing and integration verification
 - **Build**: `npm run build-test`
-
-### Test Configuration
-
-- **Config**: `tests/extension/src/config.ts`
 - **Features Demonstrated**:
   - Basic state management
-  - Partitioned state (instance-specific)
+  - Scoped state (shared and agent)
   - Persistence (local and session)
   - RPC actions with validation
   - React integration (in side panel)
@@ -256,39 +252,15 @@ function MyComponent() {
 
 ## Development Status
 
-### Current Phase
-
-- **Version**: 1.0.44 (stable, pre-v2)
-- **Focus**: Planning v2 redesign based on comprehensive code analysis
-- **Priority**: Addressing technical debt before external adoption push
-
-### v2 Redesign Planned
-
-A major version is in planning to address issues identified through code review:
-
-- Singleton pattern → Multi-instance architecture
-- API asymmetry → Unified, symmetric APIs
-- Type safety gaps → Full TypeScript safety for actions
-- Naming confusion → Consistent terminology
-- Lifecycle bugs → Proper cleanup, no listener leaks
-
-See [initiatives/v2-redesign/DESIGN.md](./initiatives/v2-redesign/DESIGN.md) for full details.
-
-### Recent Fixes (v1.x)
-
-- **Nullable State Types**: Fixed TypeScript inference issue with union types including `null`
-- **RPC Integration**: Completed RPC actions implementation
-- **Type Safety**: Enhanced type inference using `infer` keyword
-
-### Known Issues
-
-- See [v2-redesign/DESIGN.md - Current Problems](./initiatives/v2-redesign/DESIGN.md#current-problems) for comprehensive list
+- **Version**: 2.0.x (stable)
+- **Status**: Production ready
+- **Breaking Changes**: v2 introduced breaking API changes from v1. See README.md for migration guide.
 
 ## AI Assistant Guidelines
 
 ### When Working with Crann
 
-1. **State Management**: Always consider partitioning (instance vs service) when designing state
+1. **State Management**: Always consider scoping (shared vs agent) when designing state
 2. **Type Safety**: Leverage TypeScript's type system, especially for complex union types
 3. **RPC Actions**: Use for operations that need service worker context (network requests, storage APIs)
 4. **Performance**: Remember the <5kb constraint when suggesting features
@@ -296,42 +268,35 @@ See [initiatives/v2-redesign/DESIGN.md](./initiatives/v2-redesign/DESIGN.md) for
 
 ### Common Patterns
 
-- Service worker initializes with `create()`
-- Other contexts connect with `connect()`
+- Service worker initializes with `createStore(config)`
+- Other contexts connect with `connectStore(config)`
 - Use `subscribe()` for reactive updates
-- Use `callAction()` for service worker operations
+- Use `agent.actions.actionName()` for typed RPC calls
 - Prefer type assertions for complex default values
+- Always include `name` in config (required)
 
 ### Debugging Tips
 
-- Enable debug mode with `{ debug: true }`
+- Enable debug mode with `{ debug: true }` option
 - Check console logs in both service worker and client contexts
-- Use type inspection utilities for complex type issues
-- Verify porter-source connection status
+- Use `agent.ready()` or `agent.onReady()` before accessing state
+- Verify connection status with `useCrannReady()` in React
 
 ## Future Considerations
-
-### Immediate (v2)
-
-- Remove singleton pattern
-- Merge Porter-Source into Crann
-- Typed action invocation
-- React hook simplification
-- Consistent naming (shared/agent instead of service/instance)
-
-### Post-v2
 
 - DevTools integration (Redux DevTools, custom panel)
 - Middleware system
 - Computed/derived state
 - Vue/Svelte integrations
 - Performance benchmarks
+- Storage collision detection
+- Enhanced schema migration testing
 
 ### Ideas Document
 
 - Future feature ideas will be documented in `IDEAS.md`
-- See [v2-redesign/DESIGN.md - Backlog](./initiatives/v2-redesign/DESIGN.md#backlog-post-v2) for post-v2 ideas
+- See [v2-redesign/DESIGN.md - Backlog](./initiatives/v2-redesign/DESIGN.md#backlog-post-v2) for more ideas
 
 ---
 
-_Last updated: 2026-01-13_
+_Last updated: 2026-01-23_

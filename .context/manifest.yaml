@@ -1,5 +1,5 @@
 name: crann
-version: 1.0.43
+version: 2.0.6
 description: "Effortless State Synchronization for Web Extensions"
 repository: "https://github.com/moclei/crann"
 license: ISC
@@ -13,16 +13,16 @@ language: typescript
 build_system: esbuild
 
 # Core Purpose
-purpose: 
+purpose:
   primary: "State synchronization across Web Extension contexts"
   secondary: "Eliminate manual message passing boilerplate"
-  
+
 # Architecture
 architecture:
   pattern: "centralized-hub"
   hub_location: "service-worker"
-  communication: "porter-source"
-  
+  communication: "internal transport layer (merged from porter-source)"
+
 # Key Features
 features:
   - name: "automatic-state-sync"
@@ -32,71 +32,109 @@ features:
     constraint: "size < 5kb"
   - name: "typescript-support"
     description: "Full TypeScript support with strong type inference"
-  - name: "rpc-actions"
-    description: "Remote procedure calls executing in service worker"
-  - name: "state-partitioning"
-    description: "Context-specific state (instance vs service)"
+  - name: "typed-rpc-actions"
+    description: "Type-safe remote procedure calls via agent.actions.*"
+  - name: "state-scoping"
+    description: "Shared state and agent-specific state (scope: 'shared' | 'agent')"
   - name: "persistence"
     description: "Local and session storage persistence"
   - name: "react-integration"
-    description: "React hooks for state management"
+    description: "React hooks via crann/react"
 
 # Dependencies
 dependencies:
-  core:
-    - name: "porter-source"
-      version: "^1.1.20"
-      type: "peer"
-      purpose: "Message passing and agent management"
-      relationship: "foundational"
-      coupling: "tight"
-      debug_access: ".porter-debug/"
-      debug_command: "./scripts/debug-porter.sh"
-      future_consideration: "potential merger under evaluation"
-      
+  runtime:
+    - name: "uuid"
+      version: "^13.0.0"
+      type: "dependency"
+      purpose: "Agent ID generation"
+
   development:
     - name: "typescript"
       version: "^5.5.4"
       type: "dev"
       purpose: "Primary language"
     - name: "esbuild"
-      version: "^0.23.0" 
+      version: "^0.23.0"
       type: "dev"
       purpose: "Build system"
+    - name: "jest"
+      version: "^29.7.0"
+      type: "dev"
+      purpose: "Testing framework"
     - name: "webextension-polyfill"
       version: "^0.12.0"
       type: "dev"
       purpose: "Cross-browser compatibility"
-      
+
   optional:
     - name: "react"
-      version: "^18.2.0"
+      version: ">=16.8.0"
       type: "peer"
       purpose: "React integration hooks"
+    - name: "react-dom"
+      version: ">=16.8.0"
+      type: "peer"
+      purpose: "React integration"
 
 # File Structure
 structure:
   source_root: "src/"
   build_output: "dist/"
   test_location: "tests/extension/"
-  debug_dependencies: ".porter-debug/"
-  
+
   core_files:
-    - path: "src/crann.ts"
-      purpose: "Main Crann class (service worker hub)"
-      exports: ["Crann", "create"]
-    - path: "src/crannAgent.ts" 
-      purpose: "Client connection logic"
-      exports: ["connect", "connected"]
     - path: "src/index.ts"
       purpose: "Public API exports"
       role: "entry-point"
-      
-  type_definitions:
-    - path: "src/model/crann.model.ts"
-      purpose: "Core TypeScript type definitions"
-      key_types: ["ConfigItem", "ActionDefinition", "DerivedState", "Partition", "Persistence"]
-      
+    - path: "src/errors.ts"
+      purpose: "Custom error classes"
+      exports:
+        [
+          "CrannError",
+          "ConfigError",
+          "ActionError",
+          "LifecycleError",
+          "ValidationError",
+        ]
+
+  store_module:
+    - path: "src/store/Store.ts"
+      purpose: "Main Store class (service worker hub)"
+      exports: ["Store", "createStore"]
+    - path: "src/store/StateManager.ts"
+      purpose: "State operations"
+    - path: "src/store/Persistence.ts"
+      purpose: "chrome.storage integration"
+    - path: "src/store/AgentRegistry.ts"
+      purpose: "Connected agent tracking"
+    - path: "src/store/ActionExecutor.ts"
+      purpose: "RPC action execution"
+    - path: "src/store/types.ts"
+      purpose: "Config schema and derived types"
+      exports: ["createConfig", "Scope", "Persist"]
+      key_types:
+        ["ConfigSchema", "DerivedState", "DerivedActions", "ActionContext"]
+
+  agent_module:
+    - path: "src/agent/Agent.ts"
+      purpose: "Client agent class"
+      exports: ["Agent", "connectStore"]
+    - path: "src/agent/types.ts"
+      purpose: "Agent-specific types"
+
+  react_module:
+    - path: "src/react/index.ts"
+      purpose: "React entry point (crann/react)"
+    - path: "src/react/hooks.tsx"
+      purpose: "React hooks implementation"
+      exports: ["createCrannHooks"]
+
+  transport_module:
+    - path: "src/transport/"
+      purpose: "Internal message passing layer (merged from porter-source)"
+      note: "Not exposed in public API"
+
   rpc_system:
     - path: "src/rpc/adapter.ts"
       purpose: "RPC communication adapter"
@@ -104,74 +142,72 @@ structure:
       purpose: "Message endpoint implementation"
     - path: "src/rpc/types.ts"
       purpose: "RPC type definitions"
-    - path: "src/rpc/memory.ts"
-      purpose: "Memory management for transferred objects"
-      
+
   utilities:
     - path: "src/utils/logger.ts"
       purpose: "Logging system with context awareness"
-    - path: "src/utils/debug.ts"
-      purpose: "Debug management"
     - path: "src/utils/deepEqual.ts"
       purpose: "Deep equality checking for state changes"
-    - path: "src/utils/tracking.ts"
-      purpose: "State change tracking"
-    - path: "src/utils/agent.ts"
-      purpose: "Agent utilities and tagging"
-    - path: "src/utils/config.ts"
-      purpose: "Configuration helpers"
-      
-  react_integration:
-    - path: "src/hooks/useCrannState.ts"
-      purpose: "React hooks for state management"
-      exports: ["createCrannStateHook"]
+
+  legacy_files:
+    - path: "src/crann.ts"
+      purpose: "Legacy v1 Crann class (deprecated)"
+    - path: "src/crannAgent.ts"
+      purpose: "Legacy v1 Agent (deprecated)"
+    - path: "src/model/crann.model.ts"
+      purpose: "Legacy v1 types (deprecated)"
+    - note: "Legacy exports preserved for gradual migration, will be removed in v3"
 
 # Build Configuration
 build:
   tool: "esbuild"
   config_file: "esbuild.config.js"
-  
+
   outputs:
     - format: "cjs"
       path: "dist/cjs/index.js"
       target: "node14"
-    - format: "esm" 
+    - format: "esm"
       path: "dist/esm/index.js"
       target: "es2018"
+    - format: "cjs"
+      path: "dist/cjs/react.js"
+      target: "node14"
+      entry: "crann/react"
+    - format: "esm"
+      path: "dist/esm/react.js"
+      target: "es2018"
+      entry: "crann/react"
     - format: "types"
       path: "dist/types/"
-      
+
   commands:
     build_all: "npm run build"
     build_types: "npm run build:ts"
     build_js: "npm run build:js"
     build_test: "npm run build-test"
-    
-# Debug Tools
-debug:
-  porter_access:
-    command: "./scripts/debug-porter.sh"
-    purpose: "Access Porter-Source code for debugging cross-library issues"
-    location: ".porter-debug/"
-    git_ignored: true
-    
-  use_cases:
-    - "cross-library bug investigation"
-    - "message passing debugging"
-    - "agent connection troubleshooting"
-    - "AI context for complex issues"
-    - "understanding communication layer"
-    
-# Package Configuration  
+    test: "npm test"
+
+# Package Configuration
 package:
   main: "dist/cjs/index.js"
   module: "dist/esm/index.js"
   types: "dist/types/index.d.ts"
   files: ["dist"]
-  
+
+  exports:
+    ".":
+      types: "./dist/types/index.d.ts"
+      require: "./dist/cjs/index.js"
+      import: "./dist/esm/index.js"
+    "./react":
+      types: "./dist/types/react/index.d.ts"
+      require: "./dist/cjs/react.js"
+      import: "./dist/esm/react.js"
+
   keywords:
     - "web-extension"
-    - "browser-extension" 
+    - "browser-extension"
     - "extension"
     - "browser"
     - "state"
@@ -202,80 +238,115 @@ extension_contexts:
   hub:
     - name: "service-worker"
       role: "state-hub"
-      api: "create()"
-      
+      api: "createStore(config)"
+
   clients:
     - name: "content-script"
       role: "client"
-      api: "connect()"
+      api: "connectStore(config)"
     - name: "popup"
-      role: "client" 
-      api: "connect()"
+      role: "client"
+      api: "connectStore(config)"
     - name: "side-panel"
       role: "client"
-      api: "connect()"
+      api: "connectStore(config)"
     - name: "devtools"
       role: "client"
-      api: "connect()"
+      api: "connectStore(config)"
     - name: "options-page"
       role: "client"
-      api: "connect()"
+      api: "connectStore(config)"
 
 # API Surface
 api:
   service_worker:
-    - method: "create(config, options?)"
+    - method: "createStore(config, options?)"
       purpose: "Initialize state hub"
-      returns: "Crann instance"
-    - method: "get(instanceKey?)"
+      returns: "Store instance"
+    - method: "store.getState()"
       purpose: "Get current state"
-    - method: "set(state, instanceKey?)"
-      purpose: "Update state"
-    - method: "subscribe(callback)"
+    - method: "store.setState(partial)"
+      purpose: "Update state (async)"
+    - method: "store.getAgentState(agentId)"
+      purpose: "Get agent-scoped state for agent"
+    - method: "store.subscribe(callback)"
       purpose: "Listen to state changes"
-    - method: "onInstanceReady(callback)"
+    - method: "store.onAgentConnect(callback)"
       purpose: "Listen for new client connections"
-    - method: "findInstance(location)"
-      purpose: "Find specific instance by location"
-    - method: "queryAgents(criteria)"
+    - method: "store.onAgentDisconnect(callback)"
+      purpose: "Listen for client disconnections"
+    - method: "store.getAgents(query?)"
       purpose: "Query connected agents"
-      
+    - method: "store.clear()"
+      purpose: "Reset state to defaults"
+    - method: "store.destroy(options?)"
+      purpose: "Cleanup store resources"
+
   client_contexts:
-    - method: "connect(config?, options?)"
+    - method: "connectStore(config, options?)"
       purpose: "Connect to state hub"
-      returns: "Agent interface"
-    - method: "get()"
+      returns: "Agent instance"
+    - method: "agent.ready()"
+      purpose: "Returns Promise that resolves when connected"
+    - method: "agent.onReady(callback)"
+      purpose: "Callback when connected"
+    - method: "agent.getState()"
       purpose: "Get current state"
-    - method: "set(state)"
-      purpose: "Update state"
-    - method: "subscribe(callback, keys?)"
+    - method: "agent.setState(partial)"
+      purpose: "Update state (async)"
+    - method: "agent.subscribe(callback)"
       purpose: "Listen to state changes"
-    - method: "callAction(name, ...args)"
-      purpose: "Execute RPC action"
-    - method: "onReady(callback)"
-      purpose: "Connection ready handler"
+    - method: "agent.actions.*(args)"
+      purpose: "Call typed RPC action"
+    - method: "agent.getInfo()"
+      purpose: "Get agent connection info"
+    - method: "agent.onDisconnect(callback)"
+      purpose: "Handle disconnection"
+    - method: "agent.onReconnect(callback)"
+      purpose: "Handle reconnection"
+    - method: "agent.disconnect()"
+      purpose: "Cleanup agent resources"
+
+  react_hooks:
+    - method: "createCrannHooks(config)"
+      purpose: "Create hooks bound to config"
+      returns: "{ useCrannState, useCrannActions, useCrannReady, useAgent, CrannProvider }"
+    - method: "useCrannState(selector)"
+      purpose: "Read state with selector"
+    - method: "useCrannState(key)"
+      purpose: "Read state by key, returns [value, setValue]"
+    - method: "useCrannActions()"
+      purpose: "Get typed action methods"
+    - method: "useCrannReady()"
+      purpose: "Get connection status boolean"
 
 # State Management
 state_management:
-  partitioning:
-    - type: "service"
-      scope: "shared across all contexts"
-      partition: "Partition.Service"
-    - type: "instance"
-      scope: "unique per context"
-      partition: "Partition.Instance"
-      
+  scoping:
+    - type: "shared"
+      scope: "scope: 'shared'"
+      description: "shared across all contexts"
+      default: true
+    - type: "agent"
+      scope: "scope: 'agent'"
+      description: "unique per agent (content script, popup, etc.)"
+
   persistence:
     - type: "none"
-      persistence: "Persistence.None"
+      value: "Persist.None"
       lifetime: "runtime only"
+      default: true
     - type: "session"
-      persistence: "Persistence.Session"
+      value: "Persist.Session"
       lifetime: "browser session"
     - type: "local"
-      persistence: "Persistence.Local"
+      value: "Persist.Local"
       lifetime: "permanent until cleared"
-      
+
+  storage_keys:
+    format: "crann:{name}:v{version}:{key}"
+    metadata: "crann:{name}:__meta"
+
   type_support:
     - "primitive types (string, number, boolean, null)"
     - "complex objects and arrays"
@@ -285,18 +356,19 @@ state_management:
 # RPC System
 rpc:
   purpose: "Execute functions in service worker context"
-  
+
   action_definition:
-    handler: "async function with (state, setState, target, ...args)"
+    handler: "async function with (ctx, ...args)"
+    context: "{ state, setState, agentId, agentLocation }"
     validate: "optional parameter validation function"
-    
+
   features:
     - "type-safe parameter passing"
-    - "automatic state updates"
+    - "typed return values"
+    - "automatic state updates (via return or ctx.setState)"
     - "error handling and propagation"
-    - "memory management for complex objects"
     - "JSON-RPC 2.0 compatible protocol"
-    
+
   use_cases:
     - "network requests from service worker"
     - "extension API calls requiring service worker context"
@@ -305,74 +377,76 @@ rpc:
 
 # Testing
 testing:
-  primary_example: "tests/extension/"
-  
+  framework: "jest"
+
+  unit_tests:
+    location: "src/**/__tests__/"
+    files:
+      - "StateManager.test.ts"
+      - "Persistence.test.ts"
+      - "AgentRegistry.test.ts"
+      - "ActionExecutor.test.ts"
+      - "types.test.ts"
+      - "Agent.test.ts"
+      - "hooks.test.tsx"
+      - "integration.test.ts"
+
   test_extension:
-    structure:
-      - "background script (service worker)"
-      - "content script with UI injection"
-      - "popup interface"
-      - "side panel with React"
-      
+    location: "tests/extension/"
+    purpose: "Manual testing and integration verification"
+    build_command: "npm run build-test"
     demonstrates:
       - "basic state synchronization"
-      - "partitioned state management"
+      - "scoped state management"
       - "persistence options"
       - "RPC actions with validation"
       - "React integration patterns"
-      - "error handling"
-      
-    build_command: "npm run build-test"
 
 # Development Status
 status:
   phase: "stable"
-  version: "1.0.43"
-  focus: "bug detection and resolution"
-  priority: "stability over new features"
-  
-  recent_fixes:
-    - issue: "nullable state types"
-      description: "Fixed TypeScript inference with union types including null"
-      solution: "Used infer keyword instead of property access"
-      file: "src/model/crann.model.ts"
-      
-  known_issues: []
-  
-# Future Considerations
-future:
-  under_evaluation:
-    - "porter-source integration strategy (merge vs separate)"
-    - "extended browser testing"
-    - "performance optimizations"
-    
-  ideas_location: "IDEAS.md (future)"
-  
+  version: "2.0.6"
+  focus: "production ready"
+
+  breaking_changes:
+    - version: "2.0.0"
+      description: "Major API redesign from v1"
+      migration: "See README.md for migration guide"
+
+  future_work:
+    - "Storage collision detection"
+    - "Enhanced schema migration testing"
+    - "DevTools integration"
+    - "Middleware system"
+    - "Vue/Svelte integrations"
+
 # AI Assistant Context
 ai_context:
   primary_audience: ["developer", "ai-assistant"]
-  
+
   key_patterns:
-    - "service worker uses create(), clients use connect()"
+    - "service worker uses createStore(config), clients use connectStore(config)"
+    - "config must include name (required) and optionally version"
+    - "use agent.ready() or agent.onReady() before accessing state"
+    - "agent.actions.* for typed RPC calls"
     - "subscribe() for reactive updates"
-    - "callAction() for service worker operations"
     - "type assertions for complex default values"
-    
+
   debugging_tips:
     - "enable debug mode with { debug: true }"
     - "check console logs in both service worker and client contexts"
-    - "verify porter-source connection status"
-    - "use type inspection utilities for complex type issues"
-    - "use ./scripts/debug-porter.sh for cross-library debugging"
-    - "check .porter-debug/ for Porter-Source implementation details"
-    
+    - "verify connection with useCrannReady() in React"
+    - "use agent.getInfo() to inspect agent metadata"
+
   common_gotchas:
-    - "nullable types require proper union type definitions"
-    - "partitioned state is context-specific"
+    - "config.name is required"
+    - "agent-scoped state is per-agent, not per-tab (iframes get their own)"
     - "RPC actions execute in service worker context only"
-    - "persistence only applies to service state, not instance state"
-    
+    - "persistence only applies to shared state, not agent state"
+    - "always await agent.ready() before accessing state in non-React contexts"
+
   performance_considerations:
     - "bundle size constraint: < 5kb"
-    - "porter-source uses runtime.ports for performance"
+    - "transport layer uses runtime.ports for efficient messaging"
     - "deep equality checking for state change detection"
+    - "React hooks optimized to minimize re-renders"

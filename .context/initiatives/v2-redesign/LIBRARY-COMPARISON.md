@@ -1,7 +1,7 @@
 # Library Comparison Analysis
 
 > **Created:** 2026-01-14  
-> **Context:** Pre-v2 design validation  
+> **Context:** Pre-v2 design validation (v2 now released)  
 > **Status:** Reference Document
 
 ---
@@ -353,5 +353,5 @@ Signals (Solid.js, Preact Signals, Angular Signals, TC39 proposal) are gaining t
 
 ---
 
-_Last updated: 2026-01-14_
+_Last updated: 2026-01-23_
 
