@@ -23,7 +23,11 @@ import type {
   DerivedState,
   DerivedActions,
 } from "../store/types";
-import type { CrannHooks, CreateCrannHooksOptions, UseCrannStateTuple } from "./types";
+import type {
+  CrannHooks,
+  CreateCrannHooksOptions,
+  UseCrannStateTuple,
+} from "./types";
 
 /**
  * Creates a set of React hooks for a Crann store.
@@ -157,7 +161,8 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
     // For selector pattern
     const selector = isFunction
       ? (selectorOrKey as (state: DerivedState<TConfig>) => TSelected)
-      : (state: DerivedState<TConfig>) => state[selectorOrKey as K] as unknown as TSelected;
+      : (state: DerivedState<TConfig>) =>
+          state[selectorOrKey as K] as unknown as TSelected;
 
     // Track selected value
     const [selectedValue, setSelectedValue] = useState<TSelected>(() => {
@@ -201,13 +206,18 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
       const setValue = useCallback(
         async (value: DerivedState<TConfig>[K]) => {
           if (agent) {
-            await agent.setState({ [key]: value } as Partial<DerivedState<TConfig>>);
+            await agent.setState({ [key]: value } as Partial<
+              DerivedState<TConfig>
+            >);
           }
         },
         [agent, key]
       );
 
-      return [selectedValue as DerivedState<TConfig>[K], setValue] as UseCrannStateTuple<TConfig, K>;
+      return [
+        selectedValue as DerivedState<TConfig>[K],
+        setValue,
+      ] as UseCrannStateTuple<TConfig, K>;
     }
 
     return selectedValue;
@@ -218,6 +228,15 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
    *
    * The returned object and all action methods are referentially stable,
    * so they can safely be used in dependency arrays without causing re-renders.
+   *
+   * @note When using actions as event handlers, wrap them in an arrow function:
+   * ```tsx
+   * // ✓ Correct - event is not passed to action
+   * <button onClick={() => increment()}>
+   *
+   * // ✗ Incorrect - MouseEvent is passed and cannot be serialized
+   * <button onClick={increment}>
+   * ```
    */
   function useCrannActions(): DerivedActions<TConfig> {
     const agent = useAgent();
@@ -227,7 +246,9 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
     agentRef.current = agent;
 
     // Cache for action wrappers to ensure stable references
-    const actionsCacheRef = useRef<Record<string, (...args: unknown[]) => Promise<unknown>>>({});
+    const actionsCacheRef = useRef<
+      Record<string, (...args: unknown[]) => Promise<unknown>>
+    >({});
 
     // Return stable proxy that delegates to agent.actions
     const actionsRef = useRef<DerivedActions<TConfig> | null>(null);
@@ -237,13 +258,28 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
         get: (_target, actionName: string) => {
           // Return cached wrapper if it exists, otherwise create and cache it
           if (!actionsCacheRef.current[actionName]) {
-            actionsCacheRef.current[actionName] = async (...args: unknown[]) => {
+            actionsCacheRef.current[actionName] = async (
+              ...args: unknown[]
+            ) => {
               const currentAgent = agentRef.current;
               if (!currentAgent) {
                 throw new Error(
                   `Cannot call action "${actionName}" before agent is connected`
                 );
               }
+
+              // Warn if first argument looks like a DOM/React event
+              if (process.env.NODE_ENV !== "production" && args.length > 0) {
+                const firstArg = args[0];
+                if (looksLikeEvent(firstArg)) {
+                  console.warn(
+                    `[Crann] Action "${actionName}" was called with what looks like a DOM event. ` +
+                      `Events are not serializable and will cause the action to fail silently. ` +
+                      `Use onClick={() => ${actionName}()} instead of onClick={${actionName}}`
+                  );
+                }
+              }
+
               return (currentAgent.actions as any)[actionName](...args);
             };
           }
@@ -258,12 +294,14 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
   /**
    * Optional provider for dependency injection.
    */
-  const CrannProvider: FC<{ agent?: AgentAPI<TConfig>; children: ReactNode }> = ({
-    agent,
-    children,
-  }) => {
+  const CrannProvider: FC<{
+    agent?: AgentAPI<TConfig>;
+    children: ReactNode;
+  }> = ({ agent, children }) => {
     const value = agent ?? getAgent();
-    return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
+    return (
+      <AgentContext.Provider value={value}>{children}</AgentContext.Provider>
+    );
   };
 
   return {
@@ -278,6 +316,28 @@ export function createCrannHooks<TConfig extends ConfigSchema>(
 // =============================================================================
 // Utilities
 // =============================================================================
+
+/**
+ * Detect if a value looks like a DOM or React event.
+ * Used to warn developers when they accidentally pass events to actions.
+ */
+function looksLikeEvent(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+
+  const obj = value as Record<string, unknown>;
+
+  // React SyntheticEvent has nativeEvent
+  if ("nativeEvent" in obj && "type" in obj) return true;
+
+  // Native DOM events have target/currentTarget and type
+  if ("target" in obj && "currentTarget" in obj && "type" in obj) return true;
+
+  // Check for common event properties
+  if ("preventDefault" in obj && typeof obj.preventDefault === "function")
+    return true;
+
+  return false;
+}
 
 /**
  * Build default state from config.
@@ -316,4 +376,3 @@ function shallowEqual(a: unknown, b: unknown): boolean {
 
   return true;
 }
-
