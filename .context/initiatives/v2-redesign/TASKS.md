@@ -1,8 +1,9 @@
 # Crann v2 Implementation Tasks
 
 > **Reference:** [DESIGN.md](./DESIGN.md)  
-> **Status:** Not Started  
-> **Branch:** `v2` (to be created)
+> **Status:** ✅ Complete  
+> **Branch:** `v2` (merged to main)  
+> **Released:** v2.0.0 - v2.0.6
 
 ---
 
@@ -12,6 +13,7 @@
 - [~] In progress
 - [x] Complete
 - [!] Blocked
+- [—] Skipped/Abandoned
 
 ---
 
@@ -19,17 +21,17 @@
 
 **Goal:** Set up for development
 
-- [ ] Create `v2` branch from main
-- [ ] Create `.context/initiatives/release-preparedness/` folder structure
-- [ ] Move/copy porter-source into `src/transport/`
-  - [ ] Copy source files
-  - [ ] Update imports
-  - [ ] Remove porter-source from package.json dependencies
-  - [ ] Verify build works
-- [ ] Update tsconfig if needed for new structure
-- [ ] Update esbuild.config.js for new entry points (`crann`, `crann/react`)
+- [x] Create `v2` branch from main
+- [—] Create `.context/initiatives/release-preparedness/` folder structure _(abandoned)_
+- [x] Move/copy porter-source into `src/transport/`
+  - [x] Copy source files
+  - [x] Update imports
+  - [x] Remove porter-source from package.json dependencies
+  - [x] Verify build works
+- [x] Update tsconfig if needed for new structure
+- [x] Update esbuild.config.js for new entry points (`crann`, `crann/react`)
 
-**Exit Criteria:** Build passes, porter-source is internal
+**Exit Criteria:** ✅ Build passes, porter-source is internal
 
 ---
 
@@ -39,87 +41,83 @@
 
 ### 1.1 New Config Schema
 
-- [ ] Define new `ConfigItem` type with `scope` instead of `partition`
-- [ ] Define new `ActionDefinition` with `handler` receiving context object
-- [ ] Add `name` (required) and `version` (optional, default 1) to config schema
-- [ ] Create `createConfig<T>()` helper (or decide on `satisfies` pattern)
-- [ ] Update type inference (`DerivedState`, `DerivedSharedState`, `DerivedAgentState`)
-- [ ] Add `OmitNever` consistently to derived types
-- [ ] Write tests for type inference
+- [x] Define new `ConfigItem` type with `scope` instead of `partition`
+- [x] Define new `ActionDefinition` with `handler` receiving context object
+- [x] Add `name` (required) and `version` (optional, default 1) to config schema
+- [x] Create `createConfig<T>()` helper (or decide on `satisfies` pattern) → _Chose `createConfig()` with runtime validation_
+- [x] Update type inference (`DerivedState`, `DerivedSharedState`, `DerivedAgentState`)
+- [x] Add `OmitNever` consistently to derived types
+- [x] Write tests for type inference → _`src/store/__tests__/types.test.ts`_
 
 ### 1.2 Store Class (Non-Singleton)
 
-- [ ] Create new `src/store/Store.ts`
-- [ ] Constructor takes config and options (no static getInstance)
-- [ ] Options interface: `{ debug?: boolean, migrate?: fn }` (name/version come from config)
-- [ ] Validate `config.name` is provided (required)
-- [ ] Implement `destroy()` method for cleanup
-- [ ] Export `createStore()` factory function
+- [x] Create new `src/store/Store.ts`
+- [x] Constructor takes config and options (no static getInstance)
+- [x] Options interface: `{ debug?: boolean, migrate?: fn }` (name/version come from config)
+- [x] Validate `config.name` is provided (required)
+- [x] Implement `destroy()` method for cleanup
+- [x] Export `createStore()` factory function
 
 ### 1.3 StateManager Module
 
-- [ ] Extract from current Crann into `src/store/StateManager.ts`
-- [ ] `getState()` - returns full state
-- [ ] `getSharedState()` - returns shared-scoped state
-- [ ] `getAgentState(agentId)` - returns agent-scoped state for agent
-- [ ] `setState()` - properly async, returns Promise
-- [ ] `setSharedState()` - async
-- [ ] `setAgentState(agentId, state)` - async
-- [ ] Fix: await all internal state operations
-- [ ] Use proper deep equality (handle Date, Map, Set)
-- [ ] Emit change events
+- [x] Extract from current Crann into `src/store/StateManager.ts`
+- [x] `getState()` - returns full state
+- [x] `getSharedState()` - returns shared-scoped state
+- [x] `getAgentState(agentId)` - returns agent-scoped state for agent
+- [x] `setState()` - properly async, returns Promise
+- [x] `setSharedState()` - async
+- [x] `setAgentState(agentId, state)` - async
+- [x] Fix: await all internal state operations
+- [x] Use proper deep equality (handle Date, Map, Set)
+- [x] Emit change events
 
 ### 1.4 Persistence Module
 
-- [ ] Extract into `src/store/Persistence.ts`
-- [ ] `hydrate()` - load from chrome.storage
-- [ ] `persist(key, value)` - save to chrome.storage
-- [ ] Implement structured key format: `crann:{name}:v{version}:{key}`
-  - [ ] Create `buildStorageKey(config, key)` helper (reads name/version from config)
-  - [ ] Create `parseStorageKey(fullKey)` helper for cleanup utilities
-- [ ] Store metadata at `crann:{name}:__meta`
-  - [ ] Track `version`, `createdAt`, `lastAccessed`
-- [ ] Add schema versioning
-  - [ ] Read version from `__meta`
-  - [ ] Add `version` and `migrate` options to store options
-  - [ ] Call migrate on version mismatch
-- [ ] Implement collision detection
-  - [ ] On createStore(), check if `__meta` exists from another process
-  - [ ] Track active stores in memory (Set) to avoid false positives
-  - [ ] In dev: throw `CrannError` with helpful message
-  - [ ] In prod: log warning to console
-- [ ] Fix: validate keys against config before hydrating
-- [ ] Fix: only hydrate keys that exist in current config
-- [ ] Implement cleanup utilities
-  - [ ] `store.clearPersistedData()` - clears all keys for this store
-  - [ ] `store.destroy({ clearPersisted: true })` option
-  - [ ] Static `clearOrphanedData({ keepStores, dryRun })` utility
+- [x] Extract into `src/store/Persistence.ts`
+- [x] `hydrate()` - load from chrome.storage
+- [x] `persist(key, value)` - save to chrome.storage
+- [x] Implement structured key format: `crann:{name}:v{version}:{key}`
+  - [x] Create `buildStorageKey(config, key)` helper (reads name/version from config)
+  - [x] Create `parseStorageKey(fullKey)` helper for cleanup utilities
+- [x] Store metadata at `crann:{name}:__meta`
+  - [x] Track `version`, `createdAt`, `lastAccessed`
+- [x] Add schema versioning
+  - [x] Read version from `__meta`
+  - [x] Add `version` and `migrate` options to store options
+  - [x] Call migrate on version mismatch
+- [—] Implement collision detection _(not implemented - see Future Work)_
+- [x] Fix: validate keys against config before hydrating
+- [x] Fix: only hydrate keys that exist in current config
+- [x] Implement cleanup utilities
+  - [x] `store.clearPersistedData()` - clears all keys for this store
+  - [x] `store.destroy({ clearPersisted: true })` option
+  - [x] Static `clearOrphanedData({ keepStores, dryRun })` utility
 
 ### 1.5 AgentRegistry Module
 
-- [ ] Extract into `src/store/AgentRegistry.ts`
-- [ ] Track connected agents with metadata
-- [ ] `addAgent(info)` - register new agent
-- [ ] `removeAgent(id)` - unregister agent
-- [ ] `getAgent(id)` - get agent info
-- [ ] `getAgents(query)` - query by context, tabId, etc.
-- [ ] Fix: clean up `agentsInitialized` on disconnect
-- [ ] Fix: proper listener cleanup (no accumulation)
+- [x] Extract into `src/store/AgentRegistry.ts`
+- [x] Track connected agents with metadata
+- [x] `addAgent(info)` - register new agent
+- [x] `removeAgent(id)` - unregister agent
+- [x] `getAgent(id)` - get agent info
+- [x] `getAgents(query)` - query by context, tabId, etc.
+- [x] Fix: clean up `agentsInitialized` on disconnect
+- [x] Fix: proper listener cleanup (no accumulation)
 
 ### 1.6 ActionExecutor Module
 
-- [ ] Extract into `src/store/ActionExecutor.ts`
-- [ ] Execute action handlers with context object
-- [ ] Validate arguments if validator provided
-- [ ] Return results through RPC
+- [x] Extract into `src/store/ActionExecutor.ts`
+- [x] Execute action handlers with context object
+- [x] Validate arguments if validator provided
+- [x] Return results through RPC
 
 ### 1.7 Integration
 
-- [ ] Wire all modules together in Store
-- [ ] Verify store lifecycle (create → use → destroy)
-- [ ] Write integration tests
+- [x] Wire all modules together in Store
+- [x] Verify store lifecycle (create → use → destroy)
+- [x] Write integration tests → _`src/__tests__/integration.test.ts`_
 
-**Exit Criteria:** Store works, passes tests, no singleton
+**Exit Criteria:** ✅ Store works, passes tests, no singleton
 
 ---
 
@@ -129,46 +127,46 @@
 
 ### 2.1 Agent Class
 
-- [ ] Create new `src/agent/Agent.ts`
-- [ ] Constructor connects to store (no singleton)
-- [ ] Implement `disconnect()` cleanup method
+- [x] Create new `src/agent/Agent.ts`
+- [x] Constructor connects to store (no singleton)
+- [x] Implement `disconnect()` cleanup method
 
 ### 2.2 Connection Handling
 
-- [ ] Create `src/agent/Connection.ts` to wrap transport
-- [ ] Implement `ready()` - returns Promise that resolves with initial state
-- [ ] Implement `onReady(callback)` - callback style
-- [ ] Fix: don't expose state until initialState received (no race)
-- [ ] Implement `onDisconnect(callback)`
-- [ ] Implement `onReconnect(callback)`
+- [x] Create `src/agent/Connection.ts` to wrap transport → _Handled within Agent.ts_
+- [x] Implement `ready()` - returns Promise that resolves with initial state
+- [x] Implement `onReady(callback)` - callback style
+- [x] Fix: don't expose state until initialState received (no race)
+- [x] Implement `onDisconnect(callback)`
+- [x] Implement `onReconnect(callback)`
 
 ### 2.3 State Access
 
-- [ ] `getState()` - returns current state
-- [ ] `state` getter - shorthand for getState()
-- [ ] `setState(partial)` - async, returns Promise
-- [ ] `subscribe(callback)` - returns unsubscribe function
-- [ ] `subscribe(keys, callback)` - subscribe to specific keys
+- [x] `getState()` - returns current state
+- [x] `state` getter - shorthand for getState()
+- [x] `setState(partial)` - async, returns Promise
+- [x] `subscribe(callback)` - returns unsubscribe function
+- [x] `subscribe(keys, callback)` - subscribe to specific keys
 
 ### 2.4 Typed Action Proxy
 
-- [ ] Create Proxy that exposes actions as typed methods
-- [ ] `agent.actions.actionName(args)` → fully typed
-- [ ] Returns Promise with proper return type
-- [ ] Remove `callAction(string)` method
+- [x] Create Proxy that exposes actions as typed methods
+- [x] `agent.actions.actionName(args)` → fully typed
+- [x] Returns Promise with proper return type
+- [x] Remove `callAction(string)` method → _Kept as legacy export for gradual migration_
 
 ### 2.5 Agent Info
 
-- [ ] `getInfo()` - returns { id, tabId, frameId, context }
-- [ ] Abstract away porter-source types from public API
+- [x] `getInfo()` - returns { id, tabId, frameId, context }
+- [x] Abstract away porter-source types from public API
 
 ### 2.6 Integration
 
-- [ ] Export `connectStore()` factory function
-- [ ] Write tests for agent lifecycle
-- [ ] Test action type safety
+- [x] Export `connectStore()` factory function
+- [x] Write tests for agent lifecycle → _`src/agent/__tests__/Agent.test.ts`_
+- [x] Test action type safety
 
-**Exit Criteria:** Agent works, actions typed, no state race
+**Exit Criteria:** ✅ Agent works, actions typed, no state race
 
 ---
 
@@ -178,38 +176,38 @@
 
 ### 3.1 Naming Consistency
 
-- [ ] Rename throughout codebase:
-  - [ ] `partition: 'service'` → `scope: 'shared'`
-  - [ ] `partition: 'instance'` → `scope: 'agent'`
-  - [ ] `serviceState` → `sharedState`
-  - [ ] `instanceState` → `agentState`
-  - [ ] `onInstanceReady` → `onAgentConnect`
-- [ ] Update all types
-- [ ] Update all internal variables
+- [x] Rename throughout codebase:
+  - [x] `partition: 'service'` → `scope: 'shared'`
+  - [x] `partition: 'instance'` → `scope: 'agent'`
+  - [x] `serviceState` → `sharedState`
+  - [x] `instanceState` → `agentState`
+  - [x] `onInstanceReady` → `onAgentConnect`
+- [x] Update all types
+- [x] Update all internal variables
 
 ### 3.2 API Symmetry Audit
 
-- [ ] List all Store methods
-- [ ] List all Agent methods
-- [ ] Identify asymmetries
-- [ ] Decide: add to both, remove, or document why different
-- [ ] Implement changes
+- [x] List all Store methods
+- [x] List all Agent methods
+- [x] Identify asymmetries
+- [x] Decide: add to both, remove, or document why different
+- [x] Implement changes
 
 ### 3.3 Error Handling
 
-- [ ] Create custom error classes (`CrannError`, `ConnectionError`, etc.)
-- [ ] Add helpful error messages with context
-- [ ] Validate config at creation time
-- [ ] Throw early for misuse (not late RPC errors)
+- [x] Create custom error classes (`CrannError`, `ConnectionError`, etc.)
+- [x] Add helpful error messages with context
+- [x] Validate config at creation time
+- [x] Throw early for misuse (not late RPC errors)
 
 ### 3.4 TypeScript Polish
 
-- [ ] Remove all `any` casts (or document why necessary)
-- [ ] Ensure all public APIs have explicit return types
-- [ ] Add JSDoc comments to public APIs
-- [ ] Generate .d.ts files correctly
+- [x] Remove all `any` casts (or document why necessary)
+- [x] Ensure all public APIs have explicit return types
+- [x] Add JSDoc comments to public APIs
+- [x] Generate .d.ts files correctly
 
-**Exit Criteria:** API is consistent, well-typed, well-documented
+**Exit Criteria:** ✅ API is consistent, well-typed, well-documented
 
 ---
 
@@ -219,38 +217,38 @@
 
 ### 4.1 Package Structure
 
-- [ ] Create `src/react/index.ts` entry point
-- [ ] Update build to output `crann/react`
-- [ ] Update package.json exports
+- [x] Create `src/react/index.ts` entry point
+- [x] Update build to output `crann/react`
+- [x] Update package.json exports
 
 ### 4.2 Hook Factory
 
-- [ ] Implement `createCrannHooks(config)`
-- [ ] Returns object with all hooks
+- [x] Implement `createCrannHooks(config)`
+- [x] Returns object with all hooks
 
 ### 4.3 useCrannState
 
-- [ ] Selector pattern: `useCrannState(s => s.count)`
-- [ ] Key pattern: `useCrannState('count')` returns tuple
-- [ ] Handle initial state correctly (no flash)
-- [ ] Optimize re-renders (only when selected value changes)
+- [x] Selector pattern: `useCrannState(s => s.count)`
+- [x] Key pattern: `useCrannState('count')` returns tuple
+- [x] Handle initial state correctly (no flash)
+- [x] Optimize re-renders (only when selected value changes)
 
 ### 4.4 useCrannActions
 
-- [ ] Returns typed action object
-- [ ] Actions are stable references (no re-render churn)
+- [x] Returns typed action object
+- [x] Actions are stable references (no re-render churn)
 
 ### 4.5 useCrannReady
 
-- [ ] Returns boolean for connection status
-- [ ] Re-renders on connect/disconnect
+- [x] Returns boolean for connection status
+- [x] Re-renders on connect/disconnect
 
 ### 4.6 Optional Provider
 
-- [ ] `CrannProvider` for dependency injection (testing)
-- [ ] But works without provider (uses module-level connection)
+- [x] `CrannProvider` for dependency injection (testing)
+- [x] But works without provider (uses module-level connection)
 
-**Exit Criteria:** React integration is clean, no double-hook
+**Exit Criteria:** ✅ React integration is clean, no double-hook
 
 ---
 
@@ -260,43 +258,38 @@
 
 ### 5.1 Unit Tests
 
-- [ ] StateManager tests
-- [ ] Persistence tests (mock chrome.storage)
-- [ ] AgentRegistry tests
-- [ ] ActionExecutor tests
-- [ ] Logger tests
-- [ ] Type inference tests (compile-time)
+- [x] StateManager tests → _`src/store/__tests__/StateManager.test.ts`_
+- [x] Persistence tests (mock chrome.storage) → _`src/store/__tests__/Persistence.test.ts`_
+- [x] AgentRegistry tests → _`src/store/__tests__/AgentRegistry.test.ts`_
+- [x] ActionExecutor tests → _`src/store/__tests__/ActionExecutor.test.ts`_
+- [x] Logger tests
+- [x] Type inference tests (compile-time) → _`src/store/__tests__/types.test.ts`_
 
 ### 5.2 Integration Tests
 
-- [ ] Store ↔ Agent communication
-- [ ] Multiple agents scenario
-- [ ] Disconnect/reconnect scenario
-- [ ] Persistence hydration
-- [ ] Action execution end-to-end
+- [x] Store ↔ Agent communication → _`src/__tests__/integration.test.ts`_
+- [x] Multiple agents scenario
+- [x] Disconnect/reconnect scenario
+- [x] Persistence hydration
+- [x] Action execution end-to-end
 
 ### 5.3 Isolation Tests
 
-- [ ] Multiple store instances don't interfere
-- [ ] Tests can run in parallel
-- [ ] destroy() fully cleans up
+- [x] Multiple store instances don't interfere
+- [x] Tests can run in parallel
+- [x] destroy() fully cleans up
 
 ### 5.4 Documentation
 
-- [ ] Update README.md
-  - [ ] Quick start
-  - [ ] Full API reference
-  - [ ] React usage
-  - [ ] Migration from v1
-- [ ] Add CHANGELOG.md entry
-- [ ] Add examples/
-  - [ ] Basic usage
-  - [ ] With React
-  - [ ] Multiple stores
-  - [ ] Persistence
-  - [ ] Actions
+- [x] Update README.md
+  - [x] Quick start
+  - [x] Full API reference
+  - [x] React usage
+  - [x] Migration from v1
+- [—] Add CHANGELOG.md entry _(not done - future task)_
+- [—] Add examples/ _(not done - future initiative)_
 
-**Exit Criteria:** Tests pass, docs are complete
+**Exit Criteria:** ✅ Tests pass, docs are complete
 
 ---
 
@@ -306,25 +299,25 @@
 
 ### 6.1 Pre-Release
 
-- [ ] Run full test suite
-- [ ] Manual testing in test extension
-- [ ] Review all public APIs one more time
-- [ ] Check bundle size
+- [x] Run full test suite
+- [x] Manual testing in test extension
+- [x] Review all public APIs one more time
+- [x] Check bundle size
 
 ### 6.2 Version & Publish
 
-- [ ] Bump version to 2.0.0
-- [ ] Update CHANGELOG.md
-- [ ] npm publish
-- [ ] Create GitHub release
-- [ ] Tag v2.0.0
+- [x] Bump version to 2.0.0
+- [—] Update CHANGELOG.md _(not done)_
+- [x] npm publish
+- [x] Create GitHub release
+- [x] Tag v2.0.0
 
 ### 6.3 Announcement
 
-- [ ] Update GitHub description
-- [ ] (Optional) Blog post / Twitter
+- [x] Update GitHub description
+- [—] (Optional) Blog post / Twitter _(not done)_
 
-**Exit Criteria:** v2.0.0 is live on npm
+**Exit Criteria:** ✅ v2.0.0 is live on npm (now at v2.0.6)
 
 ---
 
@@ -339,6 +332,17 @@ These are nice-to-haves that didn't make the cut:
 - [ ] Svelte integration
 - [ ] Performance benchmarks
 - [ ] Time-travel debugging
+
+---
+
+## Future Work (Identified During v2)
+
+Items that were planned but not implemented, or identified as future enhancements:
+
+- [ ] **Collision detection for storage** - Detect when multiple stores use the same name. Was planned in Persistence module design but not implemented.
+- [ ] **Schema migration testing** - The `migrate` option exists but needs thorough testing and documentation.
+- [ ] **CHANGELOG.md** - Should be created and maintained going forward.
+- [ ] **examples/ directory** - Example projects demonstrating various use cases.
 
 ---
 
@@ -426,13 +430,18 @@ Use this section to record decisions made during implementation.
 
 ---
 
-### [Date] - Decision Title
+### 2026-01-23 - Legacy API Preservation
 
-**Context:** What was the situation?  
-**Options:** What were the choices?  
-**Decision:** What did we pick?  
-**Rationale:** Why?
+**Context:** During v2 implementation, decided to preserve v1 API exports for gradual migration.
+
+**Decision:** Export legacy APIs (`create`, `connect`, `Partition`, `Persistence`) with deprecation notice in `src/index.ts`.
+
+**Rationale:**
+
+- Allows existing users to migrate gradually
+- No breaking change for users who don't want to update immediately
+- Legacy exports clearly marked for removal in v3
 
 ---
 
-_Last updated: 2026-01-14_
+_Last updated: 2026-01-23_

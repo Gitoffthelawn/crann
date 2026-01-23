@@ -1,9 +1,11 @@
 # Crann v2 Design Document
 
-> **Status:** Draft  
+> **Status:** ✅ Implemented (v2.0.x)  
 > **Authors:** Marc O'Cleirigh  
 > **Created:** 2026-01-12  
-> **Last Updated:** 2026-01-13
+> **Last Updated:** 2026-01-23
+>
+> **Note:** This design document was implemented. For current API documentation, see the [README.md](../../../README.md). For task completion status, see [TASKS.md](./TASKS.md).
 
 ---
 
@@ -747,30 +749,30 @@ function Component() {
 
 ---
 
-## Open Questions
+## Open Questions (Resolved)
 
 1. **Should we keep `createConfig()` or use `as const satisfies`?**
 
    - Pro createConfig: Works in older TS, familiar pattern
    - Pro satisfies: No runtime, more modern
-   - Decision: TBD
+   - **Decision:** `createConfig()` with runtime validation. Provides better error messages and works across all TS versions.
 
 2. **Should actions be nested under `actions:` in config or flat?**
 
    - Current proposal: Nested for clarity
    - Alternative: Flat with type discrimination
-   - Decision: TBD
+   - **Decision:** Nested under `actions:` key. Clearer separation between state and actions.
 
 3. **How to handle schema migrations?**
 
    - Option A: Built-in `migrate` function in config
    - Option B: Separate migration utility
-   - Decision: TBD
+   - **Decision:** Option A - `migrate` function in store options. Receives `(oldState, oldVersion, newVersion)`.
 
 4. **Should porter-source remain publishable separately?**
    - If yes: Monorepo with pnpm workspaces
    - If no: Just merge into crann
-   - Decision: Merge for now, extract later if needed
+   - **Decision:** Merged into `src/transport/`. Can be extracted later if needed.
 
 ---
 
@@ -796,4 +798,52 @@ All reviewers agreed the core concept is sound; implementation needs polish.
 
 ---
 
-_Document version: 0.1.0-draft_
+## Implementation Notes
+
+This section documents deviations and additions made during implementation.
+
+### Deviations from Original Design
+
+1. **Legacy API Preservation**
+
+   - Original plan: Remove old API entirely
+   - Actual: Legacy exports (`create`, `connect`, `Partition`, `Persistence`) preserved with deprecation notice for gradual migration
+   - Rationale: Allows existing users to migrate at their own pace
+
+2. **Connection.ts Module**
+
+   - Original plan: Separate `src/agent/Connection.ts` to wrap transport
+   - Actual: Connection handling integrated directly into `Agent.ts`
+   - Rationale: Simpler implementation, no need for separate abstraction
+
+3. **`callAction()` Method**
+   - Original plan: Remove `callAction(string)` method entirely
+   - Actual: Kept as part of legacy exports
+   - Rationale: Backward compatibility during migration period
+
+### Features Not Implemented
+
+1. **Storage Collision Detection**
+
+   - Was planned: Detect when multiple stores use the same name
+   - Status: Not implemented
+   - Future: Could be added as an enhancement
+
+2. **Schema Migration Testing**
+   - The `migrate` option exists but needs thorough testing
+   - Future: Add comprehensive tests and documentation
+
+### Additional Features Implemented
+
+1. **`useAgent` Hook**
+
+   - Added to React hooks export for direct agent access
+   - Not in original design but useful for advanced use cases
+
+2. **RELEASE.md**
+   - Created comprehensive release process documentation
+   - Enables tag-based GitHub Actions workflow
+
+---
+
+_Document version: 1.0.0 (implemented)_

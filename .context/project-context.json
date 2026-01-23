@@ -1,5 +1,6 @@
 {
   "project_name": "Crann",
+  "version": "2.0.6",
   "description": "A lightweight state synchronization library for Web Extensions",
   "primary_purpose": "To simplify state management and synchronization across different parts of a Web Extension (Content Scripts, Service Worker, Devtools, Sidepanels, Popup, etc.)",
   "key_features": [
@@ -8,16 +9,20 @@
     "Eliminates manual message passing boilerplate",
     "Reactive state updates via subscriptions",
     "Optional state persistence (Local/Session storage)",
-    "Full TypeScript support with strong type inference"
+    "Full TypeScript support with strong type inference",
+    "Typed RPC actions via agent.actions.*",
+    "React hooks via crann/react"
   ],
   "core_components": {
     "state_hub": {
       "location": "Service Worker",
       "purpose": "Central state management and synchronization",
       "key_functions": [
-        "create",
-        "get",
-        "subscribe"
+        "createStore",
+        "getState",
+        "setState",
+        "subscribe",
+        "onAgentConnect"
       ]
     },
     "client_connections": {
@@ -29,18 +34,20 @@
         "Popup"
       ],
       "key_functions": [
-        "connect",
-        "get",
-        "set",
-        "subscribe"
+        "connectStore",
+        "ready",
+        "getState",
+        "setState",
+        "subscribe",
+        "actions.*"
       ]
     }
   },
   "state_management_features": {
-    "partitioned_state": "Support for context-specific state (Partition.Instance)",
+    "scoped_state": "Support for shared state (Scope.Shared) and agent-specific state (Scope.Agent)",
     "persistence_options": [
-      "Local Storage (Persistence.Local)",
-      "Session Storage (Persistence.Session)"
+      "Local Storage (Persist.Local)",
+      "Session Storage (Persist.Session)"
     ],
     "complex_types": "Support for custom types and type assertions"
   },
@@ -48,6 +55,6 @@
     "package_manager": "npm",
     "installation_command": "npm i crann",
     "primary_language": "TypeScript",
-    "target_platform": "Web Extensions"
+    "target_platform": "Web Extensions (Manifest V3)"
   }
 }
