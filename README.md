@@ -292,6 +292,22 @@ await increment(5);
 const result = await fetchData("https://api.example.com");
 ```
 
+> **Important: Event Handler Usage**
+>
+> When using actions as event handlers, always wrap them in an arrow function:
+>
+> ```tsx
+> // ✓ Correct
+> <button onClick={() => increment()}>Click me</button>
+>
+> // ✗ Incorrect - will fail silently
+> <button onClick={increment}>Click me</button>
+> ```
+>
+> Why? When you pass `increment` directly, React calls it with a `MouseEvent` as the first argument. DOM events are not serializable and cannot be sent through Chrome's messaging API, causing the action to fail silently.
+>
+> In development mode, Crann will log a warning if it detects an event being passed to an action.
+
 ### useCrannReady
 
 Check connection status:
